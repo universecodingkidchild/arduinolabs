@@ -1,0 +1,2861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arduino Labs/title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --win11-accent: #0067c0;
+            --win11-accent-light: #60cdff;
+            --win11-bg: #202020;
+            --win11-card: rgba(255, 255, 255, 0.05);
+            --win11-card-hover: rgba(255, 255, 255, 0.08);
+            --win11-border: rgba(255, 255, 255, 0.08);
+            --win11-text: #ffffff;
+            --win11-text-secondary: rgba(255, 255, 255, 0.6);
+            --win11-mica: rgba(32, 32, 32, 0.85);
+            --taskbar-height: 48px;
+        }
+
+        body {
+            font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            user-select: none;
+            background: #000;
+        }
+
+        /* ==================== BOOT SCREENS ==================== */
+        .boot-screen {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.8s ease;
+        }
+
+        .boot-screen.hidden { opacity: 0; pointer-events: none; }
+        .power-screen { cursor: pointer; }
+
+        .power-btn {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #333, #111);
+            border: 3px solid #222;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5), inset 0 -5px 20px rgba(0,0,0,0.5);
+        }
+
+        .power-btn:hover {
+            border-color: var(--win11-accent);
+            box-shadow: 0 0 40px rgba(0,103,192,0.3), inset 0 -5px 20px rgba(0,0,0,0.5);
+        }
+
+        .power-btn svg {
+            width: 50px;
+            height: 50px;
+            stroke: #888;
+            stroke-width: 2;
+            fill: none;
+            transition: all 0.3s;
+        }
+
+        .power-btn:hover svg { stroke: var(--win11-accent-light); filter: drop-shadow(0 0 10px var(--win11-accent)); }
+        .power-hint { margin-top: 30px; color: #444; font-size: 14px; letter-spacing: 1px; }
+
+        .loading-screen { display: none; }
+        .loading-screen.active { display: flex; }
+
+        .windows-logo {
+            width: 100px;
+            height: 100px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 60px;
+            animation: logoFade 0.5s ease;
+        }
+
+        @keyframes logoFade { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+        .windows-logo div { background: #0078d4; border-radius: 2px; }
+
+        .loading-dots { display: flex; gap: 8px; }
+        .loading-dots span {
+            width: 10px;
+            height: 10px;
+            background: #fff;
+            border-radius: 50%;
+            animation: loadingDot 1.5s ease-in-out infinite;
+        }
+        .loading-dots span:nth-child(1) { animation-delay: 0s; }
+        .loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+        .loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+        .loading-dots span:nth-child(4) { animation-delay: 0.45s; }
+        .loading-dots span:nth-child(5) { animation-delay: 0.6s; }
+
+        @keyframes loadingDot { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
+
+        .loading-text { margin-top: 40px; color: #fff; font-size: 13px; letter-spacing: 2px; opacity: 0; animation: fadeIn 0.5s ease 1s forwards; }
+        @keyframes fadeIn { to { opacity: 0.7; } }
+
+        /* ==================== MAIN CONTAINER ==================== */
+        .main-container { opacity: 0; transition: opacity 0.5s ease; }
+        .main-container.visible { opacity: 1; }
+
+        .desktop {
+            width: 100%;
+            height: calc(100vh - var(--taskbar-height));
+            position: relative;
+            overflow: hidden;
+            background: #1a1a2e;
+            background-image: 
+                radial-gradient(ellipse 80% 50% at 20% 80%, rgba(58, 134, 255, 0.4) 0%, transparent 50%),
+                radial-gradient(ellipse 60% 40% at 80% 30%, rgba(131, 56, 236, 0.35) 0%, transparent 50%),
+                radial-gradient(ellipse 50% 60% at 50% 100%, rgba(255, 0, 128, 0.2) 0%, transparent 50%),
+                linear-gradient(to bottom, #0d1b2a 0%, #1b263b 100%);
+        }
+
+        /* ==================== DESKTOP ICONS ==================== */
+        .desktop-icons { position: absolute; inset: 0; padding: 8px; }
+
+        .desktop-icon {
+            position: absolute;
+            width: 74px;
+            height: 80px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .desktop-icon:hover { background: rgba(255, 255, 255, 0.06); }
+        .desktop-icon.selected { background: rgba(255, 255, 255, 0.1); outline: 1px solid rgba(255, 255, 255, 0.1); }
+        .desktop-icon.dragging { opacity: 0.7; z-index: 1000; transition: none; }
+
+        .desktop-icon .icon-wrap {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2px;
+            pointer-events: none;
+        }
+
+        .desktop-icon span {
+            color: #fff;
+            font-size: 11px;
+            text-align: center;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+            line-height: 1.15;
+            max-width: 72px;
+            pointer-events: none;
+        }
+
+        /* ==================== FOLDER ICONS ==================== */
+        .folder-icon { width: 44px; height: 38px; position: relative; }
+        .folder-back { position: absolute; bottom: 0; left: 0; width: 100%; height: 30px; border-radius: 0 4px 4px 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .folder-tab { position: absolute; top: 0; left: 0; width: 18px; height: 10px; border-radius: 3px 3px 0 0; }
+        .folder-front { position: absolute; bottom: 0; left: 0; width: 100%; height: 26px; border-radius: 0 3px 3px 3px; }
+        .folder-label { position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 700; color: rgba(0,0,0,0.5); }
+
+        /* Project Colors */
+        .project-light .folder-back { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .project-light .folder-tab { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); }
+        .project-light .folder-front { background: linear-gradient(180deg, #fcd34d 0%, #fbbf24 100%); }
+
+        .project-sound .folder-back { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+        .project-sound .folder-tab { background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%); }
+        .project-sound .folder-front { background: linear-gradient(180deg, #c4b5fd 0%, #a78bfa 100%); }
+
+        .project-motion .folder-back { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .project-motion .folder-tab { background: linear-gradient(135deg, #34d399 0%, #10b981 100%); }
+        .project-motion .folder-front { background: linear-gradient(180deg, #6ee7b7 0%, #34d399 100%); }
+
+        .project-display .folder-back { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+        .project-display .folder-tab { background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%); }
+        .project-display .folder-front { background: linear-gradient(180deg, #93c5fd 0%, #60a5fa 100%); }
+
+        /* ==================== WINDOW ==================== */
+        .window {
+            position: absolute;
+            background: var(--win11-mica);
+            backdrop-filter: blur(50px) saturate(180%);
+            -webkit-backdrop-filter: blur(50px) saturate(180%);
+            border-radius: 8px;
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 8px 40px rgba(0,0,0,0.45);
+            min-width: 600px;
+            min-height: 500px;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .window.active { z-index: 100; box-shadow: 0 0 0 1px rgba(255,255,255,0.12), 0 25px 70px rgba(0,0,0,0.55); }
+        .window.maximized { width: 100% !important; height: calc(100vh - var(--taskbar-height)) !important; top: 0 !important; left: 0 !important; border-radius: 0; }
+
+        .titlebar { height: 32px; display: flex; align-items: center; justify-content: space-between; padding-left: 16px; flex-shrink: 0; }
+        .titlebar-left { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--win11-text); }
+        .titlebar-left .app-icon { width: 16px; height: 16px; }
+        .titlebar-controls { display: flex; height: 100%; }
+        .titlebar-controls button { width: 46px; height: 32px; border: none; background: transparent; color: var(--win11-text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .titlebar-controls button:hover { background: rgba(255,255,255,0.08); }
+        .titlebar-controls button.close-btn:hover { background: #c42b1c; }
+        .titlebar-controls svg { width: 10px; height: 10px; }
+
+        .window-body { flex: 1; overflow-y: auto; background: rgba(0,0,0,0.15); }
+        .window-body::-webkit-scrollbar { width: 14px; }
+        .window-body::-webkit-scrollbar-track { background: transparent; }
+        .window-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border: 4px solid transparent; border-radius: 7px; background-clip: padding-box; }
+
+        .resize-se { position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; cursor: se-resize; }
+
+        /* ==================== LAB PAGE CONTENT ==================== */
+        .lab-page { padding: 28px; }
+
+        .lab-header { margin-bottom: 24px; }
+        .lab-title { font-size: 26px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+        .lab-subtitle { font-size: 13px; color: var(--win11-text-secondary); margin-bottom: 8px; }
+        .lab-desc { font-size: 13px; color: var(--win11-text-secondary); line-height: 1.5; }
+
+        .project-badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-bottom: 10px; }
+        .badge-light { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        .badge-sound { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+        .badge-motion { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .badge-display { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+
+        .section { margin-bottom: 24px; }
+        .section-header { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+
+        /* ==================== MEDIA CARDS ==================== */
+        .media-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .media-card { background: var(--win11-card); border: 1px solid var(--win11-border); border-radius: 8px; overflow: hidden; }
+        .media-card:hover { background: var(--win11-card-hover); }
+        .media-card video, .media-card img { width: 100%; height: 160px; object-fit: cover; display: block; background: #000; }
+        
+        .video-thumb-wrap { position: relative; height: 160px; background: #000; cursor: pointer; overflow: hidden; }
+        .video-thumb-wrap:hover .play-overlay { opacity: 1; }
+        .video-thumb-wrap video { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+        .play-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); opacity: 0.7; transition: opacity 0.2s; }
+        .play-overlay svg { width: 50px; height: 50px; fill: #fff; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5)); }
+        
+        .photo-thumb-wrap { position: relative; height: 160px; background: #000; cursor: pointer; overflow: hidden; }
+        .photo-thumb-wrap:hover .zoom-overlay { opacity: 1; }
+        .photo-thumb-wrap img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; transition: transform 0.2s; }
+        .photo-thumb-wrap:hover img { transform: scale(1.02); }
+        .zoom-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.35); opacity: 0; transition: opacity 0.2s; }
+        .zoom-overlay svg { width: 36px; height: 36px; fill: #fff; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5)); }
+        .media-empty { height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: rgba(0,0,0,0.25); color: var(--win11-text-secondary); }
+        .media-empty svg { width: 36px; height: 36px; opacity: 0.4; }
+        .media-footer { padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--win11-border); }
+        .media-footer span { font-size: 12px; color: var(--win11-text-secondary); }
+
+        .upload-label { font-size: 11px; color: var(--win11-text); background: rgba(255,255,255,0.06); padding: 4px 10px; border-radius: 4px; cursor: pointer; border: 1px solid var(--win11-border); }
+        .upload-label:hover { background: rgba(255,255,255,0.1); }
+        .upload-label input { display: none; }
+
+        /* ==================== COMPONENTS & OBSERVATIONS ==================== */
+        .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .chip { background: var(--win11-card); border: 1px solid var(--win11-border); padding: 5px 10px; border-radius: 4px; font-size: 12px; color: #fff; }
+
+        .obs-box { background: var(--win11-card); border: 1px solid var(--win11-border); border-radius: 8px; padding: 14px; }
+        .obs-box p { font-size: 13px; line-height: 1.6; color: var(--win11-text); white-space: pre-wrap; }
+        .obs-box.empty p { color: var(--win11-text-secondary); font-style: italic; }
+
+        .edit-btn { font-size: 11px; color: var(--win11-text-secondary); background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; }
+        .edit-btn:hover { background: rgba(255,255,255,0.06); color: #fff; }
+        .edit-btn svg { width: 12px; height: 12px; fill: currentColor; }
+
+        /* ==================== CODE EDITOR ==================== */
+        .code-section { margin-bottom: 16px; }
+        .code-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .code-section-title { font-size: 12px; font-weight: 600; color: var(--win11-text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        .code-editor-wrap { position: relative; border-radius: 6px; overflow: hidden; border: 1px solid var(--win11-border); }
+        
+        .code-editor {
+            width: 100%;
+            min-height: 180px;
+            max-height: 350px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border: none;
+            padding: 14px;
+            font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            resize: vertical;
+            outline: none;
+            tab-size: 4;
+        }
+        
+        .code-editor::placeholder { color: #555; }
+        .code-editor:focus { box-shadow: inset 0 0 0 1px var(--win11-accent-light); }
+        
+        .code-status { 
+            position: absolute; 
+            top: 8px; 
+            right: 8px; 
+            font-size: 10px; 
+            padding: 3px 8px; 
+            border-radius: 3px; 
+            background: rgba(0,0,0,0.5); 
+            color: var(--win11-text-secondary);
+            pointer-events: none;
+        }
+        .code-status.has-code { background: rgba(16, 185, 129, 0.3); color: #6ee7b7; }
+
+        /* ==================== TASKBAR ==================== */
+        .taskbar { height: var(--taskbar-height); background: rgba(32, 32, 32, 0.8); backdrop-filter: blur(80px) saturate(200%); display: flex; align-items: center; justify-content: center; border-top: 1px solid rgba(255,255,255,0.06); }
+        .taskbar-center { display: flex; align-items: center; gap: 3px; }
+
+        .tb-btn { width: 44px; height: 40px; border: none; background: transparent; cursor: pointer; border-radius: 4px; display: flex; align-items: center; justify-content: center; position: relative; }
+        .tb-btn:hover { background: rgba(255,255,255,0.08); }
+        .tb-btn.active { background: rgba(255,255,255,0.1); }
+        .tb-btn svg { width: 22px; height: 22px; }
+        .tb-btn .dot { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 5px; height: 3px; background: rgba(255,255,255,0.4); border-radius: 2px; }
+        .tb-btn.active .dot { width: 14px; background: var(--win11-accent-light); }
+
+        .taskbar-right { position: absolute; right: 12px; display: flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 4px; }
+        .taskbar-right:hover { background: rgba(255,255,255,0.04); }
+        .sys-icons { display: flex; gap: 10px; margin-right: 14px; }
+        .sys-icons svg { width: 15px; height: 15px; fill: #fff; opacity: 0.85; }
+        .clock { text-align: right; color: #fff; font-size: 12px; line-height: 1.3; }
+        .clock .dt { opacity: 0.75; }
+
+        /* ==================== START MENU ==================== */
+        .start-menu { position: absolute; bottom: calc(var(--taskbar-height) + 12px); left: 50%; transform: translateX(-50%); width: 640px; background: rgba(44, 44, 44, 0.92); backdrop-filter: blur(80px) saturate(180%); border-radius: 8px; box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 30px 60px rgba(0,0,0,0.45); display: none; flex-direction: column; z-index: 1000; }
+        .start-menu.open { display: flex; }
+
+        .start-search { padding: 24px 32px 14px; }
+        .search-wrap { position: relative; }
+        .search-wrap input { width: 100%; padding: 8px 14px 8px 38px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 5px; color: #fff; font-size: 13px; outline: none; }
+        .search-wrap input:focus { border-color: var(--win11-accent-light); background: rgba(0,0,0,0.2); }
+        .search-wrap input::placeholder { color: rgba(255,255,255,0.45); }
+        .search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; fill: rgba(255,255,255,0.45); }
+
+        .start-section { padding: 6px 24px 24px; }
+        .start-label { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 12px; padding: 0 8px; }
+        .start-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; }
+
+        .start-item { display: flex; flex-direction: column; align-items: center; padding: 8px 4px; border-radius: 5px; cursor: pointer; }
+        .start-item:hover { background: rgba(255,255,255,0.08); }
+        .start-item .si-icon { width: 28px; height: 28px; margin-bottom: 4px; border-radius: 4px; }
+        .start-item span { font-size: 10px; color: #fff; text-align: center; }
+
+        .si-light { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .si-sound { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+        .si-motion { background: linear-gradient(135deg, #10b981, #059669); }
+        .si-display { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+
+        .start-footer { padding: 12px 32px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 10px; }
+        .user-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--win11-accent); display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; }
+        .user-name { font-size: 12px; color: #fff; }
+
+        /* ==================== MEDIA VIEWER MODAL ==================== */
+        .media-viewer {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.92);
+            backdrop-filter: blur(10px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            cursor: pointer;
+        }
+        
+        .media-viewer.open { display: flex; }
+        
+        .mv-close {
+            position: absolute;
+            top: 20px;
+            right: 24px;
+            width: 44px;
+            height: 44px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 50%;
+            color: #fff;
+            font-size: 28px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+            z-index: 3001;
+        }
+        
+        .mv-close:hover { background: rgba(255,255,255,0.2); }
+        
+        .mv-content {
+            max-width: 90vw;
+            max-height: 85vh;
+            cursor: default;
+        }
+        
+        .mv-content img {
+            max-width: 90vw;
+            max-height: 85vh;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        
+        .mv-content video {
+            max-width: 90vw;
+            max-height: 85vh;
+            border-radius: 8px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            background: #000;
+        }
+
+        /* ==================== MODAL ==================== */
+        .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); display: none; align-items: center; justify-content: center; z-index: 2000; }
+        .modal-bg.show { display: flex; }
+
+        .modal { background: var(--win11-mica); backdrop-filter: blur(50px); border-radius: 8px; width: 520px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.5); border: 1px solid var(--win11-border); }
+        .modal-head { padding: 16px 20px; border-bottom: 1px solid var(--win11-border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-head h3 { font-size: 14px; font-weight: 600; color: #fff; }
+        .modal-close { background: none; border: none; color: var(--win11-text-secondary); cursor: pointer; padding: 4px; border-radius: 4px; display: flex; }
+        .modal-close:hover { background: rgba(255,255,255,0.08); color: #fff; }
+
+        .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+        .field { display: flex; flex-direction: column; gap: 5px; }
+        .field label { font-size: 11px; color: var(--win11-text-secondary); }
+        .field input, .field textarea { background: rgba(0,0,0,0.25); border: 1px solid var(--win11-border); border-radius: 4px; padding: 8px 10px; color: #fff; font-size: 13px; font-family: inherit; outline: none; }
+        .field input:focus, .field textarea:focus { border-color: var(--win11-accent-light); }
+        .field textarea { min-height: 80px; resize: vertical; }
+
+        .modal-foot { padding: 12px 20px; border-top: 1px solid var(--win11-border); display: flex; justify-content: flex-end; gap: 8px; }
+        .m-btn { padding: 7px 16px; border-radius: 4px; font-size: 13px; cursor: pointer; border: none; }
+        .m-btn.secondary { background: var(--win11-card); color: #fff; border: 1px solid var(--win11-border); }
+        .m-btn.secondary:hover { background: var(--win11-card-hover); }
+        .m-btn.primary { background: var(--win11-accent); color: #fff; }
+        .m-btn.primary:hover { background: #1976d2; }
+    </style>
+</head>
+<body>
+    <!-- Power Button Boot Screen -->
+    <div class="boot-screen power-screen" id="powerScreen" onclick="startBoot()">
+        <div class="power-btn">
+            <svg viewBox="0 0 24 24"><path d="M12 3v9" stroke-linecap="round"/><path d="M18.36 6.64A9 9 0 1 1 5.64 6.64" stroke-linecap="round"/></svg>
+        </div>
+        <div class="power-hint">Click to power on</div>
+    </div>
+
+    <!-- Windows Loading Screen -->
+    <div class="boot-screen loading-screen" id="loadingScreen">
+        <div class="windows-logo"><div></div><div></div><div></div><div></div></div>
+        <div class="loading-dots"><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="loading-text">Just a moment...</div>
+    </div>
+
+    <!-- Main Desktop -->
+    <div class="main-container" id="mainContainer">
+        <div class="desktop" id="desktop">
+            <div class="desktop-icons" id="icons"></div>
+        </div>
+
+        <!-- Start Menu -->
+        <div class="start-menu" id="startMenu">
+            <div class="start-search">
+                <div class="search-wrap">
+                    <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                    <input type="text" placeholder="Type to search" id="searchInput">
+                </div>
+            </div>
+            <div class="start-section">
+                <div class="start-label">All Circuits</div>
+                <div class="start-grid" id="startGrid"></div>
+            </div>
+            <div class="start-footer">
+                <div class="user-avatar">L</div>
+                <span class="user-name">Liam</span>
+            </div>
+        </div>
+
+        <!-- Taskbar -->
+        <div class="taskbar">
+            <div class="taskbar-center" id="tbCenter">
+                <button class="tb-btn" id="startBtn">
+                    <svg viewBox="0 0 24 24" fill="#fff"><path d="M3 3h8v8H3V3zm0 10h8v8H3v-8zm10-10h8v8h-8V3zm0 10h8v8h-8v-8z"/></svg>
+                </button>
+            </div>
+            <div class="taskbar-right">
+                <div class="sys-icons">
+                    <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+                    <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+                </div>
+                <div class="clock">
+                    <div id="time"></div>
+                    <div class="dt" id="date"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Media Viewer Modal -->
+    <div class="media-viewer" id="mediaViewer" onclick="closeMediaViewer(event)">
+        <button class="mv-close" onclick="closeMediaViewer()">&times;</button>
+        <div class="mv-content" id="mvContent"></div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal-bg" id="modalBg">
+        <div class="modal">
+            <div class="modal-head">
+                <h3 id="modalTitle">Edit Circuit</h3>
+                <button class="modal-close" onclick="closeModal()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="field">
+                    <label>Components Used (comma separated)</label>
+                    <input type="text" id="editComp">
+                </div>
+                <div class="field">
+                    <label>Observations (What's happening? How do components interact?)</label>
+                    <textarea id="editObs"></textarea>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="m-btn secondary" onclick="closeModal()">Cancel</button>
+                <button class="m-btn primary" onclick="saveEdit()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== SPARKFUN SIK v4.0 CIRCUIT DATA ====================
+        const labs = [
+            // Project 1 - Light (Yellow/Orange)
+            { 
+                id: "1A", 
+                title: "Blink an LED", 
+                project: "light", 
+                projectName: "Project 1: Light",
+                description: "Learn the basics of controlling an LED by making it blink on and off. This introduces digital outputs and the fundamental concepts of programming the RedBoard.",
+                components: ["SparkFun RedBoard", "Breadboard", "LED (Blue)", "330Ω Resistor", "Jumper Wires"], 
+                observations: "", 
+                codeOriginal: `/*
+  SparkFun Inventor's Kit
+  Circuit 1A-Blink
+
+  Turns an LED connected to pin 13 on and off. Repeats forever.
+
+  This sketch was written by SparkFun Electronics, with lots of help from the Arduino community.
+  This code is completely free for any use.
+
+  View circuit diagram and instructions at: https://learn.sparkfun.com/tutorials/sparkfun-inventors-kit-experiment-guide---v40
+  Download code at: https://github.com/sparkfun/SIK-Guide-Code
+*/
+
+void setup() {
+  pinMode(13, OUTPUT);      // Set pin 13 to output
+}
+
+void loop() {
+  digitalWrite(13, HIGH);   // Turn on the LED
+  delay(2000);              // Wait for two seconds
+  digitalWrite(13, LOW);    // Turn off the LED
+  delay(2000);              // Wait for two seconds
+}`,
+                codeMod: `// Modified: Changed blink timing to 500ms (faster blink)
+
+void setup() {
+  pinMode(13, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(13, HIGH);
+  delay(500);              // Changed from 2000 to 500
+  digitalWrite(13, LOW);
+  delay(500);              // Changed from 2000 to 500
+}`,
+                video: "videos/1mov.mp4",  // <-- Change this path
+                photo: "images/1.jpg"   // <-- Change this path
+            },
+            { 
+                id: "1B", 
+                title: "Potentiometer", 
+                project: "light",
+                projectName: "Project 1: Light",
+                description: "Use a potentiometer (variable resistor) to control how fast an LED blinks. Learn about analog inputs and reading values between 0-1023.",
+                components: ["SparkFun RedBoard", "Breadboard", "LED (Blue)", "Potentiometer (10kΩ)", "330Ω Resistor", "Jumper Wires"], 
+                observations: "", 
+                codeOriginal: `/*
+  SparkFun Inventor's Kit
+  Circuit 1B-Potentiometer
+
+  Changes how fast an LED connected to pin 13 blinks, based on a potentiometer connected to pin A0
+
+  This sketch was written by SparkFun Electronics, with lots of help from the Arduino community.
+  This code is completely free for any use.
+
+  View circuit diagram and instructions at: https://learn.sparkfun.com/tutorials/sparkfun-inventors-kit-experiment-guide---v40
+  Download code at: https://github.com/sparkfun/SIK-Guide-Code
+*/
+
+int potPosition;       //this variable will hold a value based on the position of the potentiometer
+
+void setup() {
+  Serial.begin(9600);       //start a serial connection with the computer
+  pinMode(13, OUTPUT);      //set pin 13 as an output that can be set to HIGH or LOW
+}
+
+void loop() {
+  //read the position of the pot
+  potPosition = analogRead(A0);    //set potPosition to a number between 0 and 1023 based on how far the knob is turned
+  Serial.println(potPosition);     //print the value of potPosition in the serial monitor on the computer
+
+  //change the LED blink speed based on the pot value
+  digitalWrite(13, HIGH);           // Turn on the LED
+  delay(potPosition);              // delay for as many milliseconds as potPosition (0-1023)
+
+  digitalWrite(13, LOW);            // Turn off the LED
+  delay(potPosition);              // delay for as many milliseconds as potPosition (0-1023)
+}`,
+                codeMod: `// Modified: Added minimum delay of 100ms to prevent LED staying solid
+
+int potPosition;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(13, OUTPUT);
+}
+
+void loop() {
+  potPosition = analogRead(A0);
+  Serial.println(potPosition);
+
+  digitalWrite(13, HIGH);
+  delay(potPosition + 100);    // Added +100 minimum delay
+
+  digitalWrite(13, LOW);
+  delay(potPosition + 100);    // Added +100 minimum delay
+}`,
+                video: "videos/",  // <-- Change this path
+                photo: "images/2.jpg"   // <-- Change this path
+            },
+            { 
+                id: "1C", 
+                title: "Photoresistor", 
+                project: "light",
+                projectName: "Project 1: Light",
+                description: "Create a simple night-light using a photoresistor (light sensor). The LED turns on when the room gets dark and turns off when it's bright.",
+                components: ["SparkFun RedBoard", "Breadboard", "LED (Blue)", "Photoresistor", "330Ω Resistor", "10kΩ Resistor", "Jumper Wires"], 
+                observations: "", 
+                codeOriginal: `/*
+  SparkFun Inventor's Kit
+  Circuit 1C-Photoresistor
+
+  Use a photoresistor to monitor how bright a room is, and turn an LED on when it gets dark.
+
+  This sketch was written by SparkFun Electronics, with lots of help from the Arduino community.
+  This code is completely free for any use.
+
+  View circuit diagram and instructions at: https://learn.sparkfun.com/tutorials/sparkfun-inventors-kit-experiment-guide---v40
+  Download drawings and code at: https://github.com/sparkfun/SIK-Guide-Code
+*/
+
+int photoresistor = 0;              //this variable will hold a value based on the brightness of the ambient light
+int threshold = 750;                //if the photoresistor reading is below this value the the light will turn on
+
+void setup() {
+  Serial.begin(9600);               //start a serial connection with the computer
+  pinMode(13, OUTPUT);              //set pin 13 as an output that can be set to HIGH or LOW
+}
+
+void loop() {
+  //read the brightness of the ambient light
+  photoresistor = analogRead(A0);   //set photoresistor to a number between 0 and 1023 based on how bright the ambient light is
+  Serial.println(photoresistor);    //print the value of photoresistor in the serial monitor on the computer
+
+  //if the photoresistor value is below the threshold turn the light on, otherwise turn it off
+  if (photoresistor < threshold) {
+    digitalWrite(13, HIGH);         // Turn on the LED
+  } else {
+    digitalWrite(13, LOW);          // Turn off the LED
+  }
+
+  delay(100);                       //short delay to make the printout easier to read
+}`,
+                codeMod: `// Modified: Changed threshold to 500 (more sensitive to darkness)
+
+int photoresistor = 0;
+int threshold = 500;           // Changed from 750 to 500
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(13, OUTPUT);
+}
+
+void loop() {
+  photoresistor = analogRead(A0);
+  Serial.println(photoresistor);
+
+  if (photoresistor < threshold) {
+    digitalWrite(13, HIGH);
+  } else {
+    digitalWrite(13, LOW);
+  }
+
+  delay(100);
+}`,
+                video: "videos/3mov.mp4",  // <-- Change this path
+                photo: "images/3.jpg"   // <-- Change this path
+            },
+            { 
+                id: "1D", 
+                title: "RGB Night-Light", 
+                project: "light",
+                projectName: "Project 1: Light",
+                description: "Build a multicolored night-light using an RGB LED, photoresistor, and potentiometer. Change colors with the knob when it gets dark.",
+                components: ["SparkFun RedBoard", "Breadboard", "RGB LED (Common Cathode)", "Photoresistor", "Potentiometer (10kΩ)", "3x 330Ω Resistors", "10kΩ Resistor", "Jumper Wires"], 
+                observations: "", 
+                codeOriginal: `/*
+  SparkFun Inventor's Kit
+  Circuit 1D-RGB Nightlight
+
+  Turns an RGB LED on or off based on the light level read by a photoresistor.
+  Change colors by turning the potentiometer.
+
+  This sketch was written by SparkFun Electronics, with lots of help from the Arduino community.
+  This code is completely free for any use.
+
+  View circuit diagram and instructions at: https://learn.sparkfun.com/tutorials/sparkfun-inventors-kit-experiment-guide---v40
+  Download drawings and code at: https://github.com/sparkfun/SIK-Guide-Code
+*/
+
+int photoresistor = A0;          //variable for storing the photoresistor value
+int potentiometer = A1;          //this variable will hold a value based on the position of the knob
+int threshold = 700;            //if the photoresistor reading is lower than this value the light will turn on
+
+//LEDs are connected to these pins
+int RedPin = 9;
+int GreenPin = 10;
+int BluePin = 11;
+
+void setup() {
+  Serial.begin(9600);           //start a serial connection with the computer
+
+  //set the LED pins to output
+  pinMode(RedPin, OUTPUT);
+  pinMode(GreenPin, OUTPUT);
+  pinMode(BluePin, OUTPUT);
+}
+
+void loop() {
+  photoresistor = analogRead(A0);         //read the value of the photoresistor
+  potentiometer = analogRead(A1);
+
+  Serial.print("Photoresistor value:");
+  Serial.print(photoresistor);          //print the photoresistor value to the serial monitor
+  Serial.print("  Potentiometer value:");
+  Serial.println(potentiometer);          //print the potentiometer value to the serial monitor
+
+  if (photoresistor < threshold) {        //if it's dark (the photoresistor value is below the threshold) turn the LED on
+    if (potentiometer > 0 && potentiometer <= 150)
+      red();
+    if (potentiometer > 150 && potentiometer <= 300)
+      orange();
+    if (potentiometer > 300 && potentiometer <= 450)
+      yellow();
+    if (potentiometer > 450 && potentiometer <= 600)
+      green();
+    if (potentiometer > 600 && potentiometer <= 750)
+      cyan();
+    if (potentiometer > 750 && potentiometer <= 900)
+      blue();
+    if (potentiometer > 900)
+      magenta();
+  }
+  else {
+    turnOff();
+  }
+
+  delay(100);
+}
+
+void red () {
+  analogWrite(RedPin, 100);
+  analogWrite(GreenPin, 0);
+  analogWrite(BluePin, 0);
+}
+void orange () {
+  analogWrite(RedPin, 100);
+  analogWrite(GreenPin, 50);
+  analogWrite(BluePin, 0);
+}
+void yellow () {
+  analogWrite(RedPin, 100);
+  analogWrite(GreenPin, 100);
+  analogWrite(BluePin, 0);
+}
+void green () {
+  analogWrite(RedPin, 0);
+  analogWrite(GreenPin, 100);
+  analogWrite(BluePin, 0);
+}
+void cyan () {
+  analogWrite(RedPin, 0);
+  analogWrite(GreenPin, 100);
+  analogWrite(BluePin, 100);
+}
+void blue () {
+  analogWrite(RedPin, 0);
+  analogWrite(GreenPin, 0);
+  analogWrite(BluePin, 100);
+}
+void magenta () {
+  analogWrite(RedPin, 100);
+  analogWrite(GreenPin, 0);
+  analogWrite(BluePin, 100);
+}
+void turnOff () {
+  analogWrite(RedPin, 0);
+  analogWrite(GreenPin, 0);
+  analogWrite(BluePin, 0);
+}`,
+                codeMod: `// Modified: Changed threshold to 500 and increased LED brightness to 255
+
+int photoresistor = A0;
+int potentiometer = A1;
+int threshold = 500;            // Changed from 700 to 500
+
+int RedPin = 9;
+int GreenPin = 10;
+int BluePin = 11;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(RedPin, OUTPUT);
+  pinMode(GreenPin, OUTPUT);
+  pinMode(BluePin, OUTPUT);
+}
+
+void loop() {
+  photoresistor = analogRead(A0);
+  potentiometer = analogRead(A1);
+
+  Serial.print("Photoresistor value:");
+  Serial.print(photoresistor);
+  Serial.print("  Potentiometer value:");
+  Serial.println(potentiometer);
+
+  if (photoresistor < threshold) {
+    if (potentiometer > 0 && potentiometer <= 150)
+      red();
+    if (potentiometer > 150 && potentiometer <= 300)
+      orange();
+    if (potentiometer > 300 && potentiometer <= 450)
+      yellow();
+    if (potentiometer > 450 && potentiometer <= 600)
+      green();
+    if (potentiometer > 600 && potentiometer <= 750)
+      cyan();
+    if (potentiometer > 750 && potentiometer <= 900)
+      blue();
+    if (potentiometer > 900)
+      magenta();
+  }
+  else {
+    turnOff();
+  }
+  delay(100);
+}
+
+void red () {
+  analogWrite(RedPin, 255);    // Changed from 100 to 255
+  analogWrite(GreenPin, 0);
+  analogWrite(BluePin, 0);
+}
+void orange () {
+  analogWrite(RedPin, 255);
+  analogWrite(GreenPin, 128);  // Changed from 50 to 128
+  analogWrite(BluePin, 0);
+}
+void yellow () {
+  analogWrite(RedPin, 255);
+  analogWrite(GreenPin, 255);
+  analogWrite(BluePin, 0);
+}
+void green () {
+  analogWrite(RedPin, 0);
+  analogWrite(GreenPin, 255);
+  analogWrite(BluePin, 0);
+}
+void cyan () {
+  analogWrite(RedPin, 0);
+  analogWrite(GreenPin, 255);
+  analogWrite(BluePin, 255);
+}
+void blue () {
+  analogWrite(RedPin, 0);
+  analogWrite(GreenPin, 0);
+  analogWrite(BluePin, 255);
+}
+void magenta () {
+  analogWrite(RedPin, 255);
+  analogWrite(GreenPin, 0);
+  analogWrite(BluePin, 255);
+}
+void turnOff () {
+  analogWrite(RedPin, 0);
+  analogWrite(GreenPin, 0);
+  analogWrite(BluePin, 0);
+}`,
+                video: "videos/1D.mp4",  // <-- Change this path
+                photo: "images/4.jpg"   // <-- Change this path
+            },
+            
+            // Project 2 - Sound (Purple)
+            { 
+                id: "2A", 
+                title: "Buzzer", 
+                project: "sound",
+                projectName: "Project 2: Sound",
+                description: "Use a piezo buzzer to make music by pulsing electricity at different frequencies. Learn about the tone() function and how frequency creates pitch.",
+                components: ["SparkFun RedBoard", "Breadboard", "Piezo Buzzer", "Potentiometer (10kΩ)", "Jumper Wires"], 
+                observations: "", 
+                codeOriginal: `/*
+  SparkFun Inventor's Kit
+  Circuit 2A - Buzzer
+
+  Play notes using a buzzer connected to pin 10
+
+  This sketch was written by SparkFun Electronics, with lots of help from the Arduino community.
+  This code is completely free for any use.
+
+  View circuit diagram and instructions at: https://learn.sparkfun.com/tutorials/sparkfun-inventors-kit-experiment-guide---v40
+  Download drawings and code at: https://github.com/sparkfun/SIK-Guide-Code
+*/
+
+int speakerPin = 10;               //the pin that buzzer is connected to
+
+void setup() {
+  pinMode(speakerPin, OUTPUT);    //set the output pin for the speaker
+}
+
+void loop() {
+  play('g', 2);       //ha
+  play('g', 1);       //ppy
+  play('a', 4);       //birth
+  play('g', 4);       //day
+  play('C', 4);       //to
+  play('b', 4);       //you
+
+  play(' ', 2);       //pause for 2 beats
+
+  play('g', 2);       //ha
+  play('g', 1);       //ppy
+  play('a', 4);       //birth
+  play('g', 4);       //day
+  play('D', 4);       //to
+  play('C', 4);       //you
+
+  play(' ', 2);       //pause for 2 beats
+
+  play('g', 2);       //ha
+  play('g', 1);       //ppy
+  play('G', 4);       //birth
+  play('E', 4);       //day
+  play('C', 4);       //dear
+  play('b', 4);       //your
+  play('a', 6);       //name
+
+  play(' ', 2);       //pause for 2 beats
+
+  play('F', 2);       //ha
+  play('F', 1);       //ppy
+  play('E', 4);       //birth
+  play('C', 4);       //day
+  play('D', 4);       //to
+  play('C', 6);       //you
+
+  while (true) {}     //get stuck in this loop forever so that the song only plays once
+}
+
+void play(char note, int beats) {
+  int numNotes = 14;
+  char notes[] = { 'c', 'd', 'e', 'f', 'g', 'a', 'b', 'C', 'D', 'E', 'F', 'G', 'A', 'B', ' '};
+  int frequencies[] = {131, 147, 165, 175, 196, 220, 247, 262, 294, 330, 349, 392, 440, 494, 0};
+
+  int currentFrequency = 0;
+  int beatLength = 150;
+
+  for (int i = 0; i < numNotes; i++) {
+    if (notes[i] == note) {
+      currentFrequency = frequencies[i];
+    }
+  }
+
+  tone(speakerPin, currentFrequency, beats * beatLength);
+  delay(beats * beatLength);
+  delay(50);
+}`,
+                codeMod: `// Modified: Changed tempo from 150 to 100 (faster song)
+
+int speakerPin = 10;
+
+void setup() {
+  pinMode(speakerPin, OUTPUT);
+}
+
+void loop() {
+  play('g', 2);
+  play('g', 1);
+  play('a', 4);
+  play('g', 4);
+  play('C', 4);
+  play('b', 4);
+  play(' ', 2);
+  play('g', 2);
+  play('g', 1);
+  play('a', 4);
+  play('g', 4);
+  play('D', 4);
+  play('C', 4);
+  play(' ', 2);
+  play('g', 2);
+  play('g', 1);
+  play('G', 4);
+  play('E', 4);
+  play('C', 4);
+  play('b', 4);
+  play('a', 6);
+  play(' ', 2);
+  play('F', 2);
+  play('F', 1);
+  play('E', 4);
+  play('C', 4);
+  play('D', 4);
+  play('C', 6);
+
+  while (true) {}
+}
+
+void play(char note, int beats) {
+  int numNotes = 14;
+  char notes[] = { 'c', 'd', 'e', 'f', 'g', 'a', 'b', 'C', 'D', 'E', 'F', 'G', 'A', 'B', ' '};
+  int frequencies[] = {131, 147, 165, 175, 196, 220, 247, 262, 294, 330, 349, 392, 440, 494, 0};
+
+  int currentFrequency = 0;
+  int beatLength = 100;        // Changed from 150 to 100 (faster)
+
+  for (int i = 0; i < numNotes; i++) {
+    if (notes[i] == note) {
+      currentFrequency = frequencies[i];
+    }
+  }
+
+  tone(speakerPin, currentFrequency, beats * beatLength);
+  delay(beats * beatLength);
+  delay(30);                   // Changed from 50 to 30
+}`,
+                video: "videos/2A.mp4",  // <-- Change this path
+                photo: "images/2A.jpg"   // <-- Change this path
+            },
+            { 
+                id: "2B", 
+                title: "Digital Trumpet", 
+                project: "sound",
+                projectName: "Project 2: Sound",
+                description: "Build a simple musical instrument using buttons and a buzzer. Each button plays a different note when pressed using INPUT_PULLUP.",
+                components: ["SparkFun RedBoard", "Breadboard", "Piezo Buzzer", "3x Push Buttons", "Potentiometer (10kΩ)", "Jumper Wires"], 
+                observations: "", 
+                codeOriginal: `/*
+  SparkFun Inventor's Kit
+  Circuit 2B-ButtonTrumpet
+
+  Use 3 buttons plugged to play musical notes on a buzzer.
+
+  This sketch was written by SparkFun Electronics, with lots of help from the Arduino community.
+  This code is completely free for any use.
+
+  View circuit diagram and instructions at: https://learn.sparkfun.com/tutorials/sparkfun-inventors-kit-experiment-guide---v40
+  Download drawings and code at: https://github.com/sparkfun/SIK-Guide-Code
+*/
+
+//set the pins for the button and buzzer
+int firstKeyPin = 2;
+int secondKeyPin = 3;
+int thirdKeyPin = 4;
+
+int buzzerPin = 10;
+
+
+void setup() {
+  //set the button pins as inputs
+  pinMode(firstKeyPin, INPUT_PULLUP);
+  pinMode(secondKeyPin, INPUT_PULLUP);
+  pinMode(thirdKeyPin, INPUT_PULLUP);
+
+  //set the buzzer pin as an output
+  pinMode(buzzerPin, OUTPUT);
+}
+
+void loop() {
+
+  if (digitalRead(firstKeyPin) == LOW) {      //if the first key is pressed
+    tone(buzzerPin, 262);                     //play the frequency for c
+  }
+  else if (digitalRead(secondKeyPin) == LOW) { //if the second key is pressed
+    tone(buzzerPin, 330);                     //play the frequency for e
+  }
+  else if (digitalRead(thirdKeyPin) == LOW) { //if the third key is pressed
+    tone(buzzerPin, 392);                     //play the frequency for g
+  }
+  else {
+    noTone(buzzerPin);                        //if no key is pressed turn the buzzer off
+  }
+}
+
+/*
+  note  frequency
+  c     262 Hz
+  d     294 Hz
+  e     330 Hz
+  f     349 Hz
+  g     392 Hz
+  a     440 Hz
+  b     494 Hz
+  C     523 Hz
+*/`,
+                codeMod: `// Modified: Changed frequencies to play d, f, a instead of c, e, g
+
+int firstKeyPin = 2;
+int secondKeyPin = 3;
+int thirdKeyPin = 4;
+
+int buzzerPin = 10;
+
+void setup() {
+  pinMode(firstKeyPin, INPUT_PULLUP);
+  pinMode(secondKeyPin, INPUT_PULLUP);
+  pinMode(thirdKeyPin, INPUT_PULLUP);
+  pinMode(buzzerPin, OUTPUT);
+}
+
+void loop() {
+  if (digitalRead(firstKeyPin) == LOW) {
+    tone(buzzerPin, 294);                  // Changed to d (was 262 c)
+  }
+  else if (digitalRead(secondKeyPin) == LOW) {
+    tone(buzzerPin, 349);                  // Changed to f (was 330 e)
+  }
+  else if (digitalRead(thirdKeyPin) == LOW) {
+    tone(buzzerPin, 440);                  // Changed to a (was 392 g)
+  }
+  else {
+    noTone(buzzerPin);
+  }
+}`,
+                video: "videos/2bmov.mp4",  // <-- Change this path
+                photo: "images/2b.jpg"   // <-- Change this path
+            },
+            { 
+                id: "2C", 
+                title: "Simon Says Game", 
+                project: "sound",
+                projectName: "Project 2: Sound",
+                description: "Create the classic Simon Says memory game! LEDs flash a pattern and the player must repeat it using color-coded buttons before time runs out.",
+                components: ["SparkFun RedBoard", "Breadboard", "Piezo Buzzer", "4x LEDs (Red, Blue, Green, Yellow)", "4x Push Buttons", "4x 330Ω Resistors", "Jumper Wires"], 
+                observations: "", 
+                codeOriginal: `/*
+  SparkFun Inventor's Kit
+  Circuit 2C-Simon Says
+
+  The Simon Says game flashes a pattern using LED lights, then the player must repeat the pattern.
+
+  This sketch was written by SparkFun Electronics, with lots of help from the Arduino community.
+  This code is completely free for any use.
+
+  View circuit diagram and instructions at: https://learn.sparkfun.com/tutorials/sparkfun-inventors-kit-experiment-guide---v40
+  Download drawings and code at: https://github.com/sparkfun/SIK-Guide-Code
+*/
+
+//set the pins where the buttons, LEDs and buzzer connect
+int button[] = {2, 4, 6, 8};  //red is button[0], yellow is button[1], green is button[2], blue is button[3]
+int led[] = {3, 5, 7, 9};     //red is led[0], yellow is led[1], green is led[2], blue is led[3]
+int tones[] = {262, 330, 392, 494};   //tones to play with each button (c, e, g, b)
+
+int roundsToWin = 10;         //number of rounds the player has to play before they win the game (the array can only hold up to 16 rounds)
+int buttonSequence[16];       //make an array of numbers that will be the sequence that the player needs to remember
+
+int buzzerPin = 10;           //pin that the buzzer is connected to
+
+int pressedButton = 4;        //a variable to remember which button is being pressed. 4 is the value if no button is being pressed.
+int roundCounter = 1;         //keeps track of what round the player is on
+
+long startTime = 0;           //timer variable for time limit on button press
+long timeLimit = 2000;        //time limit to hit a button
+
+boolean gameStarted = false;      //variable to tell the game whether or not to play the start sequence
+
+void setup() {
+  //set all of the button pins to input_pullup (use the built-in pull-up resistors)
+  pinMode(button[0], INPUT_PULLUP);
+  pinMode(button[1], INPUT_PULLUP);
+  pinMode(button[2], INPUT_PULLUP);
+  pinMode(button[3], INPUT_PULLUP);
+
+  //set all of the LED pins to output
+  pinMode(led[0], OUTPUT);
+  pinMode(led[1], OUTPUT);
+  pinMode(led[2], OUTPUT);
+  pinMode(led[3], OUTPUT);
+
+  pinMode(buzzerPin, OUTPUT);   //set the buzzer pin to output
+}
+
+void loop() {
+  if (gameStarted == false) {   //if the game hasn't started yet
+    startSequence();            //flash the start sequence
+    roundCounter = 0;           //reset the round counter
+    delay(1500);                //wait a second and a half
+    gameStarted = true;         //set gameStarted to true so that this sequence doesn't start again
+  }
+
+  //each round, start by flashing out the sequence to be repeated
+  for (int i = 0; i <= roundCounter; i++) { //go through the array up to the current round number
+    flashLED(buttonSequence[i]);          //turn on the LED for that array position and play the sound
+    delay(200);                           //wait
+    allLEDoff();                          //turn all of the LEDs off
+    delay(200);
+  }
+
+  //then start going through the sequence one at a time and see if the user presses the correct button
+  for (int i = 0; i <= roundCounter; i++) { //for each button to be pressed in the sequence
+    startTime = millis();                 //record the start time
+
+    while (gameStarted == true) { //loop until the player presses a button or the time limit is up
+      pressedButton = buttonCheck();      //every loop check to see which button is pressed
+
+      if (pressedButton < 4) {            //if a button is pressed... (4 means that no button is pressed)
+        flashLED(pressedButton);          //flash the LED for the button that was pressed
+
+        if (pressedButton == buttonSequence[i]) { //if the button matches the button in the sequence
+          delay(250);                   //leave the LED light on for a moment
+          allLEDoff();                  //then turn off all of the lights and
+          break;                        //end the while loop
+        } else {                          //if the button doesn't match the button in the sequence
+          loseSequence();               //play the lose sequence
+          break;
+        }
+      } else {                            //if no button is pressed
+        allLEDoff();                      //turn all the LEDs off
+      }
+
+      //check to see if the time limit is up
+      if (millis() - startTime > timeLimit) { //if the time limit is up
+        loseSequence();                       //play the lose sequence
+        break;
+      }
+    }
+  }
+
+  if (gameStarted == true) {
+    roundCounter = roundCounter + 1;      //increase the round number by 1
+
+    if (roundCounter >= roundsToWin) {    //if the player has gotten to the winning round
+      winSequence();                      //play the winning song
+    }
+    delay(500);                           //wait for half a second between rounds
+  }
+}
+
+//----------FUNCTIONS------------
+
+void flashLED (int ledNumber) {
+  digitalWrite(led[ledNumber], HIGH);
+  tone(buzzerPin, tones[ledNumber]);
+}
+
+void allLEDoff () {
+  digitalWrite(led[0], LOW);
+  digitalWrite(led[1], LOW);
+  digitalWrite(led[2], LOW);
+  digitalWrite(led[3], LOW);
+  noTone(buzzerPin);
+}
+
+int buttonCheck() {
+  if (digitalRead(button[0]) == LOW) {
+    return 0;
+  } else if (digitalRead(button[1]) == LOW) {
+    return 1;
+  } else if (digitalRead(button[2]) == LOW) {
+    return 2;
+  } else if (digitalRead(button[3]) == LOW) {
+    return 3;
+  } else {
+    return 4; //no button pressed
+  }
+}
+
+void startSequence() {
+  randomSeed(analogRead(A0));   //make sure the random numbers are really random
+
+  for (int i = 0; i <= roundsToWin; i++) {
+    buttonSequence[i] = round(random(0, 4));
+  }
+
+  for (int i = 0; i <= 3; i++) {
+    tone(buzzerPin, tones[i], 200);
+    digitalWrite(led[0], HIGH);
+    digitalWrite(led[1], HIGH);
+    digitalWrite(led[2], HIGH);
+    digitalWrite(led[3], HIGH);
+    delay(100);
+    digitalWrite(led[0], LOW);
+    digitalWrite(led[1], LOW);
+    digitalWrite(led[2], LOW);
+    digitalWrite(led[3], LOW);
+    delay(100);
+  }
+}
+
+void winSequence() {
+  for (int j = 0; j <= 3; j++) {
+    digitalWrite(led[j], HIGH);
+  }
+
+  tone(buzzerPin, 1318, 150);   //E6
+  delay(175);
+  tone(buzzerPin, 1567, 150);   //G6
+  delay(175);
+  tone(buzzerPin, 2637, 150);   //E7
+  delay(175);
+  tone(buzzerPin, 2093, 150);   //C7
+  delay(175);
+  tone(buzzerPin, 2349, 150);   //D7
+  delay(175);
+  tone(buzzerPin, 3135, 500);   //G7
+  delay(500);
+
+  do {
+    pressedButton = buttonCheck();
+  } while (pressedButton > 3);
+  delay(100);
+
+  gameStarted = false;
+}
+
+void loseSequence() {
+  for (int j = 0; j <= 3; j++) {
+    digitalWrite(led[j], HIGH);
+  }
+
+  tone(buzzerPin, 130, 250);
+  delay(275);
+  tone(buzzerPin, 73, 250);
+  delay(275);
+  tone(buzzerPin, 65, 150);
+  delay(175);
+  tone(buzzerPin, 98, 500);
+  delay(500);
+
+  do {
+    pressedButton = buttonCheck();
+  } while (pressedButton > 3);
+  delay(200);
+
+  gameStarted = false;
+}`,
+                codeMod: `// Modified: Changed roundsToWin to 5 and timeLimit to 3000ms (harder game)
+
+int button[] = {2, 4, 6, 8};
+int led[] = {3, 5, 7, 9};
+int tones[] = {262, 330, 392, 494};
+
+int roundsToWin = 5;              // Changed from 10 to 5
+int buttonSequence[16];
+
+int buzzerPin = 10;
+int pressedButton = 4;
+int roundCounter = 1;
+
+long startTime = 0;
+long timeLimit = 3000;            // Changed from 2000 to 3000
+
+boolean gameStarted = false;
+
+void setup() {
+  pinMode(button[0], INPUT_PULLUP);
+  pinMode(button[1], INPUT_PULLUP);
+  pinMode(button[2], INPUT_PULLUP);
+  pinMode(button[3], INPUT_PULLUP);
+
+  pinMode(led[0], OUTPUT);
+  pinMode(led[1], OUTPUT);
+  pinMode(led[2], OUTPUT);
+  pinMode(led[3], OUTPUT);
+
+  pinMode(buzzerPin, OUTPUT);
+}
+
+void loop() {
+  if (gameStarted == false) {
+    startSequence();
+    roundCounter = 0;
+    delay(1500);
+    gameStarted = true;
+  }
+
+  for (int i = 0; i <= roundCounter; i++) {
+    flashLED(buttonSequence[i]);
+    delay(200);
+    allLEDoff();
+    delay(200);
+  }
+
+  for (int i = 0; i <= roundCounter; i++) {
+    startTime = millis();
+
+    while (gameStarted == true) {
+      pressedButton = buttonCheck();
+
+      if (pressedButton < 4) {
+        flashLED(pressedButton);
+
+        if (pressedButton == buttonSequence[i]) {
+          delay(250);
+          allLEDoff();
+          break;
+        } else {
+          loseSequence();
+          break;
+        }
+      } else {
+        allLEDoff();
+      }
+
+      if (millis() - startTime > timeLimit) {
+        loseSequence();
+        break;
+      }
+    }
+  }
+
+  if (gameStarted == true) {
+    roundCounter = roundCounter + 1;
+    if (roundCounter >= roundsToWin) {
+      winSequence();
+    }
+    delay(500);
+  }
+}
+
+void flashLED (int ledNumber) {
+  digitalWrite(led[ledNumber], HIGH);
+  tone(buzzerPin, tones[ledNumber]);
+}
+
+void allLEDoff () {
+  digitalWrite(led[0], LOW);
+  digitalWrite(led[1], LOW);
+  digitalWrite(led[2], LOW);
+  digitalWrite(led[3], LOW);
+  noTone(buzzerPin);
+}
+
+int buttonCheck() {
+  if (digitalRead(button[0]) == LOW) return 0;
+  else if (digitalRead(button[1]) == LOW) return 1;
+  else if (digitalRead(button[2]) == LOW) return 2;
+  else if (digitalRead(button[3]) == LOW) return 3;
+  else return 4;
+}
+
+void startSequence() {
+  randomSeed(analogRead(A0));
+  for (int i = 0; i <= roundsToWin; i++) {
+    buttonSequence[i] = round(random(0, 4));
+  }
+  for (int i = 0; i <= 3; i++) {
+    tone(buzzerPin, tones[i], 200);
+    digitalWrite(led[0], HIGH);
+    digitalWrite(led[1], HIGH);
+    digitalWrite(led[2], HIGH);
+    digitalWrite(led[3], HIGH);
+    delay(100);
+    allLEDoff();
+    delay(100);
+  }
+}
+
+void winSequence() {
+  for (int j = 0; j <= 3; j++) digitalWrite(led[j], HIGH);
+  tone(buzzerPin, 1318, 150); delay(175);
+  tone(buzzerPin, 1567, 150); delay(175);
+  tone(buzzerPin, 2637, 150); delay(175);
+  tone(buzzerPin, 2093, 150); delay(175);
+  tone(buzzerPin, 2349, 150); delay(175);
+  tone(buzzerPin, 3135, 500); delay(500);
+  do { pressedButton = buttonCheck(); } while (pressedButton > 3);
+  delay(100);
+  gameStarted = false;
+}
+
+void loseSequence() {
+  for (int j = 0; j <= 3; j++) digitalWrite(led[j], HIGH);
+  tone(buzzerPin, 130, 250); delay(275);
+  tone(buzzerPin, 73, 250); delay(275);
+  tone(buzzerPin, 65, 150); delay(175);
+  tone(buzzerPin, 98, 500); delay(500);
+  do { pressedButton = buttonCheck(); } while (pressedButton > 3);
+  delay(200);
+  gameStarted = false;
+}`,
+                video: "videos/2cmov.mp4",  // <-- Change this path
+                photo: "images/2c.jpg"   // <-- Change this path
+            },
+            
+            // Project 3 - Motion (Green)
+            { 
+                id: "3A", 
+                title: "Servo Motors", 
+                project: "motion",
+                projectName: "Project 3: Motion",
+                description: "Control a servo motor's position using a potentiometer. Servos can rotate to specific angles between 0-180 degrees using the Servo library.",
+                components: ["SparkFun RedBoard", "Breadboard", "Servo Motor", "Potentiometer (10kΩ)", "Jumper Wires"], 
+                observations: "", 
+                codeOriginal: `/*
+  SparkFun Inventor's Kit
+  Circuit 3A-Servo
+
+  Move a servo attached to pin 9 so that it's angle matches a potentiometer attached to A0.
+
+  This sketch was written by SparkFun Electronics, with lots of help from the Arduino community.
+  This code is completely free for any use.
+
+  View circuit diagram and instructions at: https://learn.sparkfun.com/tutorials/sparkfun-inventors-kit-experiment-guide---v40
+  Download drawings and code at: https://github.com/sparkfun/SIK-Guide-Code
+*/
+
+#include <Servo.h>          //include the servo library
+
+int potPosition;           //this variable will store the position of the potentiometer
+int servoPosition;         //the servo will move to this position
+
+Servo myservo;              //create a servo object
+
+void setup() {
+  myservo.attach(9);        //tell the servo object that its servo is plugged into pin 9
+}
+
+void loop() {
+  potPosition = analogRead(A0);                     //use analog read to measure the position of the potentiometer (0-1023)
+
+  servoPosition = map(potPosition, 0, 1023, 20, 160); //convert the potentiometer number to a servo position from 20-160
+                                                      //Note: its best to avoid driving the little SIK servos all the
+                                                      //way to 0 or 180 degrees it can cause the motor to jitter, which is bad for the servo.
+
+  myservo.write(servoPosition);                      //move the servo to the calculated position
+}`,
+                codeMod: `// Modified: Changed servo range to full 0-180 degrees
+
+#include <Servo.h>
+
+int potPosition;
+int servoPosition;
+
+Servo myservo;
+
+void setup() {
+  myservo.attach(9);
+}
+
+void loop() {
+  potPosition = analogRead(A0);
+
+  servoPosition = map(potPosition, 0, 1023, 0, 180);  // Changed from 20-160 to 0-180
+
+  myservo.write(servoPosition);
+}`,
+                video: "videos/3amov.mp4",  // <-- Change this path
+                photo: "images/3a.jpg"   // <-- Change this path
+            },
+            { 
+                id: "3B", 
+                title: "Distance Sensor", 
+                project: "motion",
+                projectName: "Project 3: Motion",
+                description: "Use an ultrasonic distance sensor (HC-SR04) to measure distances. It sends sound pulses and measures how long they take to bounce back.",
+                components: ["SparkFun RedBoard", "Breadboard", "Ultrasonic Distance Sensor (HC-SR04)", "Jumper Wires"], 
+                observations: "", 
+                codeOriginal: `/*
+  SparkFun Inventor's Kit
+  Circuit 3B-Distance Sensor
+
+  Control the color of an RGB LED using an ultrasonic distance sensor.
+
+  This sketch was written by SparkFun Electronics, with lots of help from the Arduino community.
+  This code is completely free for any use.
+
+  View circuit diagram and instructions at: https://learn.sparkfun.com/tutorials/sparkfun-inventors-kit-experiment-guide---v40
+  Download drawings and code at: https://github.com/sparkfun/SIK-Guide-Code
+*/
+
+const int trigPin = 11;           //connects to the trigger pin on the distance sensor
+const int echoPin = 12;           //connects to the echo pin on the distance sensor
+
+const int redPin = 3;             //pin to control the red LED inside the RGB LED
+const int greenPin = 5;           //pin to control the green LED inside the RGB LED
+const int bluePin = 6;            //pin to control the blue LED inside the RGB LED
+
+float distance = 0;               //stores the distance measured by the distance sensor
+
+void setup() {
+  Serial.begin (9600);        //set up a serial connection with the computer
+
+  pinMode(trigPin, OUTPUT);   //the trigger pin will output pulses of electricity
+  pinMode(echoPin, INPUT);    //the echo pin will measure the duration of pulses coming back from the distance sensor
+
+  //set the RGB LED pins to output
+  pinMode(redPin, OUTPUT);
+  pinMode(greenPin, OUTPUT);
+  pinMode(bluePin, OUTPUT);
+}
+
+void loop() {
+  distance = getDistance();   //variable to store the distance measured by the sensor
+
+  Serial.print(distance);     //print the distance that was measured
+  Serial.println(" in");      //print units after the distance
+
+  if (distance <= 10) {                       //if the object is close
+    //make the RGB LED red
+    analogWrite(redPin, 255);
+    analogWrite(greenPin, 0);
+    analogWrite(bluePin, 0);
+
+  } else if (10 < distance && distance < 20) { //if the object is a medium distance
+    //make the RGB LED yellow
+    analogWrite(redPin, 255);
+    analogWrite(greenPin, 50);
+    analogWrite(bluePin, 0);
+
+  } else {                                    //if the object is far away
+    //make the RGB LED green
+    analogWrite(redPin, 0);
+    analogWrite(greenPin, 255);
+    analogWrite(bluePin, 0);
+  }
+
+  delay(50);      //delay 50ms between each reading
+}
+
+//------------------FUNCTIONS-------------------------------
+
+//RETURNS THE DISTANCE MEASURED BY THE HC-SR04 DISTANCE SENSOR
+float getDistance() {
+  float echoTime;                   //variable to store the time it takes for a ping to bounce off an object
+  float calculatedDistance;         //variable to store the distance calculated from the echo time
+
+  //send out an ultrasonic pulse that's 10ms long
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  echoTime = pulseIn(echoPin, HIGH);      //use the pulsein command to see how long it takes for the
+                                          //pulse to bounce back to the sensor
+
+  calculatedDistance = echoTime / 148.0;  //calculate the distance of the object that reflected the pulse
+
+  return calculatedDistance;              //send back the distance that was calculated
+}`,
+                codeMod: `// Modified: Changed distance thresholds to 5 and 15 inches
+
+const int trigPin = 11;
+const int echoPin = 12;
+
+const int redPin = 3;
+const int greenPin = 5;
+const int bluePin = 6;
+
+float distance = 0;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  pinMode(redPin, OUTPUT);
+  pinMode(greenPin, OUTPUT);
+  pinMode(bluePin, OUTPUT);
+}
+
+void loop() {
+  distance = getDistance();
+
+  Serial.print(distance);
+  Serial.println(" in");
+
+  if (distance <= 5) {                        // Changed from 10 to 5
+    analogWrite(redPin, 255);
+    analogWrite(greenPin, 0);
+    analogWrite(bluePin, 0);
+
+  } else if (5 < distance && distance < 15) { // Changed from 10-20 to 5-15
+    analogWrite(redPin, 255);
+    analogWrite(greenPin, 50);
+    analogWrite(bluePin, 0);
+
+  } else {
+    analogWrite(redPin, 0);
+    analogWrite(greenPin, 255);
+    analogWrite(bluePin, 0);
+  }
+
+  delay(50);
+}
+
+float getDistance() {
+  float echoTime;
+  float calculatedDistance;
+
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  echoTime = pulseIn(echoPin, HIGH);
+  calculatedDistance = echoTime / 148.0;
+
+  return calculatedDistance;
+}`,
+                video: "videos/3bmov.mp4",  // <-- Change this path
+                photo: "images/3b.jpg"   // <-- Change this path
+            },
+            { 
+                id: "3C", 
+                title: "Motion Alarm", 
+                project: "motion",
+                projectName: "Project 3: Motion",
+                description: "Build a motion alarm that uses the distance sensor to detect intruders. When triggered, it activates a buzzer, RGB LED color change, and servo motor.",
+                components: ["SparkFun RedBoard", "Breadboard", "Ultrasonic Distance Sensor (HC-SR04)", "Servo Motor", "Piezo Buzzer", "RGB LED", "3x 330Ω Resistors", "Jumper Wires"], 
+                observations: "", 
+                codeOriginal: `/*
+  SparkFun Inventor's Kit
+  Circuit 3C-Motion Alarm
+
+  Control the color of an RGB LED using an ultrasonic distance sensor. When an object is close to the sensor, buzz the buzzer and wiggle the servo motor.
+
+  This sketch was written by SparkFun Electronics, with lots of help from the Arduino community.
+  This code is completely free for any use.
+
+  View circuit diagram and instructions at: https://learn.sparkfun.com/tutorials/sparkfun-inventors-kit-experiment-guide---v40
+  Download drawings and code at: https://github.com/sparkfun/SIK-Guide-Code
+*/
+
+#include <Servo.h>                //include the servo library
+
+const int trigPin = 11;           //connects to the trigger pin on the distance sensor
+const int echoPin = 12;           //connects to the echo pin on the distance sensor
+
+const int redPin = 3;             //pin to control the red LED inside the RGB LED
+const int greenPin = 5;           //pin to control the green LED inside the RGB LED
+const int bluePin = 6;            //pin to control the blue LED inside the RGB LED
+
+const int buzzerPin = 10;         //pin that will drive the buzzer
+
+float distance = 0;               //stores the distance measured by the distance sensor
+
+Servo myservo;                    //create a servo object
+
+void setup() {
+  Serial.begin (9600);        //set up a serial connection with the computer
+
+  pinMode(trigPin, OUTPUT);   //the trigger pin will output pulses of electricity
+  pinMode(echoPin, INPUT);    //the echo pin will measure the duration of pulses coming back from the distance sensor
+
+  //set the RGB LED pins to output
+  pinMode(redPin, OUTPUT);
+  pinMode(greenPin, OUTPUT);
+  pinMode(bluePin, OUTPUT);
+
+  pinMode(buzzerPin, OUTPUT);   //set the buzzer pin to output
+
+  myservo.attach(9);            //use pin 9 to control the servo
+}
+
+void loop() {
+  distance = getDistance();   //variable to store the distance measured by the sensor
+
+  Serial.print(distance);     //print the distance that was measured
+  Serial.println(" in");      //print units after the distance
+
+  if (distance <= 10) {                       //if the object is close
+    //make the RGB LED red
+    analogWrite(redPin, 255);
+    analogWrite(greenPin, 0);
+    analogWrite(bluePin, 0);
+
+    //this code wiggles the servo and beeps the buzzer
+    tone(buzzerPin, 272);         //buzz the buzzer pin
+    myservo.write(10);            //move the servo to 10 degrees
+    delay(100);                   //wait 100 milliseconds
+
+    noTone(buzzerPin);            //turn the buzzer off
+    myservo.write(150);           //move the servo to 150 degrees
+    delay(100);                   //wait 100 milliseconds
+
+  } else if (10 < distance && distance < 20) { //if the object is a medium distance
+    //make the RGB LED yellow
+    analogWrite(redPin, 255);
+    analogWrite(greenPin, 50);
+    analogWrite(bluePin, 0);
+
+  } else {                                    //if the object is far away
+    //make the RGB LED green
+    analogWrite(redPin, 0);
+    analogWrite(greenPin, 255);
+    analogWrite(bluePin, 0);
+  }
+
+  delay(50);      //delay 50ms between each reading
+}
+
+//------------------FUNCTIONS-------------------------------
+
+//RETURNS THE DISTANCE MEASURED BY THE HC-SR04 DISTANCE SENSOR
+float getDistance() {
+  float echoTime;                   //variable to store the time it takes for a ping to bounce off an object
+  float calculatedDistance;         //variable to store the distance calculated from the echo time
+
+  //send out an ultrasonic pulse that's 10ms long
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  echoTime = pulseIn(echoPin, HIGH);      //use the pulsein command to see how long it takes for the
+                                          //pulse to bounce back to the sensor
+
+  calculatedDistance = echoTime / 148.0;  //calculate the distance of the object that reflected the pulse
+
+  return calculatedDistance;              //send back the distance that was calculated
+}`,
+                codeMod: `// Modified: Changed buzzer frequency to 400Hz and servo angles to 30-120
+
+#include <Servo.h>
+
+const int trigPin = 11;
+const int echoPin = 12;
+
+const int redPin = 3;
+const int greenPin = 5;
+const int bluePin = 6;
+
+const int buzzerPin = 10;
+
+float distance = 0;
+
+Servo myservo;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  pinMode(redPin, OUTPUT);
+  pinMode(greenPin, OUTPUT);
+  pinMode(bluePin, OUTPUT);
+  pinMode(buzzerPin, OUTPUT);
+  myservo.attach(9);
+}
+
+void loop() {
+  distance = getDistance();
+
+  Serial.print(distance);
+  Serial.println(" in");
+
+  if (distance <= 10) {
+    analogWrite(redPin, 255);
+    analogWrite(greenPin, 0);
+    analogWrite(bluePin, 0);
+
+    tone(buzzerPin, 400);        // Changed from 272 to 400
+    myservo.write(30);           // Changed from 10 to 30
+    delay(100);
+
+    noTone(buzzerPin);
+    myservo.write(120);          // Changed from 150 to 120
+    delay(100);
+
+  } else if (10 < distance && distance < 20) {
+    analogWrite(redPin, 255);
+    analogWrite(greenPin, 50);
+    analogWrite(bluePin, 0);
+
+  } else {
+    analogWrite(redPin, 0);
+    analogWrite(greenPin, 255);
+    analogWrite(bluePin, 0);
+  }
+
+  delay(50);
+}
+
+float getDistance() {
+  float echoTime;
+  float calculatedDistance;
+
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  echoTime = pulseIn(echoPin, HIGH);
+  calculatedDistance = echoTime / 148.0;
+
+  return calculatedDistance;
+}`,
+                video: "videos/3c.mp4",  // <-- Change this path
+                photo: "images/3cblue.jpg"   // <-- Change this path
+            },
+            
+            // Project 4 - Display (Blue)
+            { 
+                id: "4A", 
+                title: "LCD \"Hello, World!\"", 
+                project: "display",
+                projectName: "Project 4: Display",
+                description: "Learn to use a 16x2 character LCD display with the LiquidCrystal library. Print text messages and create scrolling effects.",
+                components: ["SparkFun RedBoard", "Breadboard", "LCD Display (16x2)", "Potentiometer (10kΩ)", "Jumper Wires"], 
+                observations: "", 
+                codeOriginal: `/*
+  SparkFun Inventor's Kit
+  Circuit 4A-HelloWorld
+
+  The LCD will display the words "Hello World" and show how many seconds have passed since
+  the RedBoard was last reset.
+
+  This sketch was written by SparkFun Electronics, with lots of help from the Arduino community.
+  This code is completely free for any use.
+
+  View circuit diagram and instructions at: https://learn.sparkfun.com/tutorials/sparkfun-inventors-kit-experiment-guide---v40
+  Download drawings and code at: https://github.com/sparkfun/SIK-Guide-Code
+*/
+
+#include <LiquidCrystal.h>          //the liquid crystal library contains commands for printing to the display
+
+LiquidCrystal lcd(13, 12, 11, 10, 9, 8);   // tell the RedBoard what pins are connected to the display
+
+void setup() {
+  lcd.begin(16, 2);                 //tell the lcd library that we are using a display that is 16 characters wide and 2 characters high
+  lcd.clear();                      //clear the display
+}
+
+void loop() {
+  lcd.setCursor(0, 0);              //set the cursor to the 0,0 position (top left corner)
+  lcd.print("Hello, world!");       //print hello, world! starting at that position
+
+  lcd.setCursor(0, 1);              //move the cursor to the first space of the bottom row
+  lcd.print(millis() / 1000);       //print the number of seconds that have passed since the last reset
+}`,
+                codeMod: `// Modified: Changed message and added minutes display
+
+#include <LiquidCrystal.h>
+
+LiquidCrystal lcd(13, 12, 11, 10, 9, 8);
+
+void setup() {
+  lcd.begin(16, 2);
+  lcd.clear();
+}
+
+void loop() {
+  lcd.setCursor(0, 0);
+  lcd.print("Arduino Labs!");    // Changed from "Hello, world!"
+
+  lcd.setCursor(0, 1);
+  int seconds = millis() / 1000;
+  int minutes = seconds / 60;
+  lcd.print(minutes);
+  lcd.print("m ");
+  lcd.print(seconds % 60);       // Shows minutes and seconds
+  lcd.print("s");
+}`,
+                video: "videos/helloworldmov.mp4",  // <-- Change this path
+                photo: "images/helloworld.jpg"   // <-- Change this path
+            },
+            { 
+                id: "4B", 
+                title: "LCD Thermometer", 
+                project: "display",
+                projectName: "Project 4: Display",
+                description: "Create a digital thermometer using a TMP36 temperature sensor and LCD display. Show real-time temperature readings in Celsius and Fahrenheit.",
+                components: ["SparkFun RedBoard", "Breadboard", "LCD Display (16x2)", "Temperature Sensor (TMP36)", "Potentiometer (10kΩ)", "Jumper Wires"], 
+                observations: "", 
+                codeOriginal: `/*
+  SparkFun Inventor's Kit
+  Circuit 4B - Temperature Sensor
+
+  The LCD will display readings from a temperature sensor in degrees Celsius and Fahrenheit.
+
+  This sketch was written by SparkFun Electronics, with lots of help from the Arduino community.
+  This code is completely free for any use.
+
+  View circuit diagram and instructions at: https://learn.sparkfun.com/tutorials/sparkfun-inventors-kit-experiment-guide---v40
+  Download drawings and code at: https://github.com/sparkfun/SIK-Guide-Code
+*/
+
+#include <LiquidCrystal.h>                  //the liquid crystal library contains commands for printing to the display
+LiquidCrystal lcd(13, 12, 11, 10, 9, 8);    // tell the RedBoard what pins are connected to the display
+
+float voltage = 0;                          //the voltage measured from the TMP36
+float degreesC = 0;                         //the temperature in Celsius, calculated from the voltage
+float degreesF = 0;                         //the temperature in Fahrenheit, calculated from the voltage
+
+void setup() {
+  lcd.begin(16, 2);                         //tell the lcd library that we are using a display that is 16 characters wide and 2 characters high
+  lcd.clear();                              //clear the display
+}
+
+void loop() {
+  voltage = analogRead(A0) * 0.004882813;   //convert the analog reading, which varies from 0 to 1023, back to a voltage value from 0-5 volts
+  degreesC = (voltage - 0.5) * 100.0;       //convert the voltage to a temperature in degrees Celsius
+  degreesF = degreesC * (9.0 / 5.0) + 32.0; //convert the voltage to a temperature in degrees Fahrenheit
+
+  lcd.clear();                              //clear the LCD
+
+  lcd.setCursor(0, 0);                      //set the cursor to the top left position
+  lcd.print("Degrees C: ");                 //print a label for the data
+  lcd.print(degreesC);                      //print the degrees Celsius
+
+  lcd.setCursor(0, 1);                      //set the cursor to the lower left position
+  lcd.print("Degrees F: ");                 //Print a label for the data
+  lcd.print(degreesF);                      //print the degrees Fahrenheit
+
+  delay(1000);                              //delay for 1 second between each reading (this makes the display less noisy)
+}`,
+                codeMod: `// Modified: Changed refresh rate to 500ms and added decimal precision
+
+#include <LiquidCrystal.h>
+LiquidCrystal lcd(13, 12, 11, 10, 9, 8);
+
+float voltage = 0;
+float degreesC = 0;
+float degreesF = 0;
+
+void setup() {
+  lcd.begin(16, 2);
+  lcd.clear();
+}
+
+void loop() {
+  voltage = analogRead(A0) * 0.004882813;
+  degreesC = (voltage - 0.5) * 100.0;
+  degreesF = degreesC * (9.0 / 5.0) + 32.0;
+
+  lcd.clear();
+
+  lcd.setCursor(0, 0);
+  lcd.print("C: ");
+  lcd.print(degreesC, 1);        // Show 1 decimal place
+  lcd.print((char)223);          // Degree symbol
+  lcd.print("C");
+
+  lcd.setCursor(0, 1);
+  lcd.print("F: ");
+  lcd.print(degreesF, 1);        // Show 1 decimal place
+  lcd.print((char)223);          // Degree symbol
+  lcd.print("F");
+
+  delay(500);                    // Changed from 1000 to 500
+}`,
+                video: "videos/tempsensormov.mp4",  // <-- Change this path
+                photo: "images/tempsensor.jpg"   // <-- Change this path
+            },
+            { 
+                id: "4C", 
+                title: "DIY Who Am I? Game", 
+                project: "display",
+                projectName: "Project 4: Display",
+                description: "Build an interactive guessing game displayed on the LCD. Use buttons to scroll through clues and make guesses. Includes buzzer for feedback.",
+                components: ["SparkFun RedBoard", "Breadboard", "LCD Display (16x2)", "Piezo Buzzer", "Potentiometer (10kΩ)", "2x Push Buttons", "Jumper Wires"], 
+                observations: "", 
+                codeOriginal: `/*
+  SparkFun Inventor's Kit
+  Circuit 4C - Heads Up Game
+
+  This is a DIY version of the popular Heads Up party game. To play, one person resets the RedBoard and holds the LCD
+  facing away from them so that they cannot see it (usually on their forehead). The display will show a short countdown
+  then display random words. The other player(s) who can see the screen must yell out clues until time runs out or the player
+  guesses what word is on the screen. If they guess correctly, they can press the button on the breadboard and another word
+  will be displayed.
+
+  This sketch was written by SparkFun Electronics, with lots of help from the Arduino community.
+  This code is completely free for any use.
+
+  View circuit diagram and instructions at: https://learn.sparkfun.com/tutorials/sparkfun-inventors-kit-experiment-guide---v40
+  Download drawings and code at: https://github.com/sparkfun/SIK-Guide-Code
+*/
+
+#include <LiquidCrystal.h>            //the liquid crystal library contains commands for printing to the display
+LiquidCrystal lcd(13, 12, 11, 10, 9, 8);     // tell the RedBoard what pins are connected to the display
+
+int buttonPin = 2;                    //pin that the button is connected to
+int buzzerPin = 6;                    //pin for driving the buzzer
+int buttonPressTime = 0;              //variable to show how much time the player has left to guess the word
+
+long timeLimit = 15000;               //time limit for the player to guess each word
+long startTime = 0;                   //used to measure time that has passed for each word
+int roundNumber = 0;                  //keeps track of the roundNumber so that it can be displayed at the end of the game
+const int arraySize = 25;
+
+const char* words[arraySize] = {"moose", "beaver", "bear", "goose", "dog", "cat", "squirrel", "bird", "elephant", "horse",
+                                "bull", "giraffe", "seal", "bat", "skunk", "turtle", "whale", "rhino", "lion", "monkey",
+                                "frog", "alligator", "kangaroo", "hippo", "rabbit"};
+
+int sequence[] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+
+void setup() {
+  pinMode(buttonPin, INPUT_PULLUP);       //set the button pin as an input
+
+  lcd.begin(16, 2);                       //tell the LCD library the size of the screen
+
+  generateRandomOrder();                  //generate an array of random numbers from 0 to 24
+
+  showStartSequence();                    //print the start sequence text
+}
+
+void loop() {
+  for (int i = 0; i < arraySize; i++) {   //for each of the 25 words in the sequence
+
+    lcd.clear();                          //clear off the array
+
+    roundNumber = i + 1;                  //the array starts at 0, but the roundNumber will start counting from 1
+    lcd.print(roundNumber);               //print the roundNumber
+    lcd.print(": ");                      //spacer between the number and the word
+    lcd.print(words[sequence[i]]);        //print a random word from the word array
+
+    startTime = millis();                 //record the time that this round started
+
+    while (digitalRead(buttonPin) == HIGH) {         //do this until the button is pressed...
+
+      int roundedTime = round((timeLimit - (millis() - startTime)) / 1000);
+      lcd.setCursor(14, 1);
+      lcd.print("  ");
+      lcd.setCursor(14, 1);
+      lcd.print(roundedTime);
+      delay(15);
+
+      if (millis() - startTime > timeLimit) {       //if the time limit is up before the button is pressed
+        gameOver();                                 //end the game
+      }
+
+      if (digitalRead(buttonPin) == LOW) {
+        tone(buzzerPin, 272, 10);                   //emit a short beep when the button is pressed
+      }
+    }
+
+    delay(500);             //delay for a moment before going onto the next round
+  }
+  //if you finish all 25 words
+  winner();   //show the you win message
+}
+
+//--------------FUNCTIONS------------------------------
+
+void showStartSequence() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Category:");
+  lcd.setCursor(0, 1);
+  lcd.print("Animals");
+  delay(2000);
+
+  lcd.clear();
+  lcd.print("Get ready!");
+  delay(1000);
+
+  lcd.clear();
+  lcd.print("3");
+  delay(1000);
+
+  lcd.clear();
+  lcd.print("2");
+  delay(1000);
+
+  lcd.clear();
+  lcd.print("1");
+  delay(1000);
+}
+
+void generateRandomOrder() {
+  randomSeed(analogRead(0));
+
+  for (int i = 0; i < arraySize; i++) {
+    int currentNumber = 0;
+    boolean match = false;
+
+    do {
+      currentNumber = random(0, arraySize);
+      match = false;
+      for (int j = 0; j < arraySize; j++) {
+        if (currentNumber == sequence[j]) {
+          match = true;
+        }
+      }
+    } while (match == true);
+    sequence[i] = currentNumber;
+  }
+}
+
+void gameOver() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Game Over");
+  lcd.setCursor(0, 1);
+  lcd.print("Score: ");
+  lcd.print(roundNumber);
+
+  tone(buzzerPin, 130, 250);
+  delay(275);
+  tone(buzzerPin, 73, 250);
+  delay(275);
+  tone(buzzerPin, 65, 150);
+  delay(175);
+  tone(buzzerPin, 98, 500);
+  delay(500);
+
+  while (true) {}
+}
+
+void winner() {
+  lcd.clear();
+  lcd.setCursor(7, 0);
+  lcd.print("YOU");
+  lcd.setCursor(7, 1);
+  lcd.print("WIN!");
+
+  tone(buzzerPin, 1318, 150);
+  delay(175);
+  tone(buzzerPin, 1567, 150);
+  delay(175);
+  tone(buzzerPin, 2637, 150);
+  delay(175);
+  tone(buzzerPin, 2093, 150);
+  delay(175);
+  tone(buzzerPin, 2349, 150);
+  delay(175);
+  tone(buzzerPin, 3135, 500);
+  delay(500);
+
+  while (true) {}
+}`,
+                codeMod: `// Modified: Changed time limit to 10 seconds and reduced word count to 15
+
+#include <LiquidCrystal.h>
+LiquidCrystal lcd(13, 12, 11, 10, 9, 8);
+
+int buttonPin = 2;
+int buzzerPin = 6;
+int buttonPressTime = 0;
+
+long timeLimit = 10000;              // Changed from 15000 to 10000
+long startTime = 0;
+int roundNumber = 0;
+const int arraySize = 15;            // Changed from 25 to 15
+
+const char* words[arraySize] = {"moose", "beaver", "bear", "goose", "dog", 
+                                "cat", "squirrel", "bird", "elephant", "horse",
+                                "bull", "giraffe", "seal", "bat", "skunk"};
+
+int sequence[] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+
+void setup() {
+  pinMode(buttonPin, INPUT_PULLUP);
+  lcd.begin(16, 2);
+  generateRandomOrder();
+  showStartSequence();
+}
+
+void loop() {
+  for (int i = 0; i < arraySize; i++) {
+    lcd.clear();
+    roundNumber = i + 1;
+    lcd.print(roundNumber);
+    lcd.print(": ");
+    lcd.print(words[sequence[i]]);
+    startTime = millis();
+
+    while (digitalRead(buttonPin) == HIGH) {
+      int roundedTime = round((timeLimit - (millis() - startTime)) / 1000);
+      lcd.setCursor(14, 1);
+      lcd.print("  ");
+      lcd.setCursor(14, 1);
+      lcd.print(roundedTime);
+      delay(15);
+
+      if (millis() - startTime > timeLimit) {
+        gameOver();
+      }
+      if (digitalRead(buttonPin) == LOW) {
+        tone(buzzerPin, 272, 10);
+      }
+    }
+    delay(500);
+  }
+  winner();
+}
+
+void showStartSequence() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Category:");
+  lcd.setCursor(0, 1);
+  lcd.print("Animals");
+  delay(2000);
+  lcd.clear();
+  lcd.print("Get ready!");
+  delay(1000);
+  lcd.clear();
+  lcd.print("3");
+  delay(1000);
+  lcd.clear();
+  lcd.print("2");
+  delay(1000);
+  lcd.clear();
+  lcd.print("1");
+  delay(1000);
+}
+
+void generateRandomOrder() {
+  randomSeed(analogRead(0));
+  for (int i = 0; i < arraySize; i++) {
+    int currentNumber = 0;
+    boolean match = false;
+    do {
+      currentNumber = random(0, arraySize);
+      match = false;
+      for (int j = 0; j < arraySize; j++) {
+        if (currentNumber == sequence[j]) match = true;
+      }
+    } while (match == true);
+    sequence[i] = currentNumber;
+  }
+}
+
+void gameOver() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Game Over");
+  lcd.setCursor(0, 1);
+  lcd.print("Score: ");
+  lcd.print(roundNumber);
+  tone(buzzerPin, 130, 250); delay(275);
+  tone(buzzerPin, 73, 250); delay(275);
+  tone(buzzerPin, 65, 150); delay(175);
+  tone(buzzerPin, 98, 500); delay(500);
+  while (true) {}
+}
+
+void winner() {
+  lcd.clear();
+  lcd.setCursor(7, 0);
+  lcd.print("YOU");
+  lcd.setCursor(7, 1);
+  lcd.print("WIN!");
+  tone(buzzerPin, 1318, 150); delay(175);
+  tone(buzzerPin, 1567, 150); delay(175);
+  tone(buzzerPin, 2637, 150); delay(175);
+  tone(buzzerPin, 2093, 150); delay(175);
+  tone(buzzerPin, 2349, 150); delay(175);
+  tone(buzzerPin, 3135, 500); delay(500);
+  while (true) {}
+}`,
+                video: "videos/finalmov.mp4",  // <-- Change this path
+                photo: "images/final.jpg"   // <-- Change this path
+            }
+        ];
+
+        // ==================== STATE VARIABLES ====================
+        const iconPositions = {};
+        const GRID = 82;
+        let wins = {}, activeWin = null, zIdx = 10, drag = null, resize = null, editId = null, iconDrag = null;
+
+        // ==================== BOOT SEQUENCE ====================
+        function startBoot() {
+            document.getElementById('powerScreen').classList.add('hidden');
+            document.getElementById('loadingScreen').classList.add('active');
+            setTimeout(() => {
+                document.getElementById('loadingScreen').classList.add('hidden');
+                document.getElementById('mainContainer').classList.add('visible');
+                init();
+            }, 3000);
+        }
+
+        // ==================== INITIALIZATION ====================
+        function init() {
+            // Load saved data from localStorage
+            loadFromStorage();
+            
+            const groups = { light: [], sound: [], motion: [], display: [] };
+            labs.forEach(l => groups[l.project].push(l));
+            let col = 0;
+            Object.values(groups).forEach(group => {
+                group.forEach((l, i) => { iconPositions[l.id] = { x: 8 + col * GRID, y: 8 + i * GRID }; });
+                col++;
+            });
+            renderIcons();
+            renderStart();
+            renderTB();
+            tick();
+            setInterval(tick, 1000);
+            events();
+        }
+
+        // ==================== RENDER DESKTOP ICONS ====================
+        function renderIcons() {
+            document.getElementById('icons').innerHTML = labs.map(l => {
+                const p = iconPositions[l.id];
+                return `<div class="desktop-icon" id="icon-${l.id}" style="left:${p.x}px;top:${p.y}px" ondblclick="openWin('${l.id}')" onmousedown="startIconDrag(event,'${l.id}')">
+                    <div class="icon-wrap"><div class="folder-icon project-${l.project}"><div class="folder-back"></div><div class="folder-tab"></div><div class="folder-front"></div><span class="folder-label">${l.id}</span></div></div>
+                    <span>${l.id}</span>
+                </div>`;
+            }).join('');
+        }
+
+        // ==================== ICON DRAGGING ====================
+        function startIconDrag(e, id) {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            const icon = document.getElementById('icon-' + id);
+            document.querySelectorAll('.desktop-icon').forEach(i => i.classList.remove('selected'));
+            icon.classList.add('selected');
+            iconDrag = { id, el: icon, sx: e.clientX, sy: e.clientY, ox: iconPositions[id].x, oy: iconPositions[id].y, moved: false };
+        }
+
+        // ==================== RENDER START MENU ====================
+        function renderStart() {
+            document.getElementById('startGrid').innerHTML = labs.map(l => `
+                <div class="start-item" onclick="openWin('${l.id}'); toggleStart();">
+                    <div class="si-icon si-${l.project}"></div>
+                    <span>${l.id}</span>
+                </div>
+            `).join('');
+        }
+
+        // ==================== RENDER TASKBAR ====================
+        function renderTB() {
+            const c = document.getElementById('tbCenter');
+            const s = c.querySelector('#startBtn').outerHTML;
+            const colors = { light: '#f59e0b', sound: '#8b5cf6', motion: '#10b981', display: '#3b82f6' };
+            c.innerHTML = s + Object.entries(wins).map(([id, d]) => {
+                const lab = labs.find(l => l.id === d.labId);
+                return `<button class="tb-btn ${id === activeWin && !d.min ? 'active' : ''}" onclick="tbClick('${id}')">
+                    <svg viewBox="0 0 48 48" width="22" height="22"><rect x="6" y="12" width="36" height="24" rx="3" fill="${colors[lab.project]}"/></svg>
+                    <div class="dot"></div>
+                </button>`;
+            }).join('');
+        }
+
+        // ==================== OPEN WINDOW ====================
+        function openWin(labId) {
+            const lab = labs.find(l => l.id === labId), wid = 'w' + labId;
+            if (wins[wid]) { document.getElementById(wid).style.display = 'flex'; wins[wid].min = false; setActive(wid); renderTB(); return; }
+            
+            const w = document.createElement('div');
+            w.className = 'window'; w.id = wid;
+            const colors = { light: '#f59e0b', sound: '#8b5cf6', motion: '#10b981', display: '#3b82f6' };
+            Object.assign(w.style, { width: '950px', height: '720px', left: 80 + Object.keys(wins).length * 30 % 150 + 'px', top: 25 + Object.keys(wins).length * 30 % 70 + 'px', display: 'flex' });
+            
+            w.innerHTML = `
+                <div class="titlebar" onmousedown="startDrag(event,'${wid}')">
+                    <div class="titlebar-left">
+                        <svg class="app-icon" viewBox="0 0 48 48" width="16" height="16"><rect x="4" y="10" width="40" height="28" rx="3" fill="${colors[lab.project]}"/></svg>
+                        <span>Circuit ${lab.id}: ${lab.title}</span>
+                    </div>
+                    <div class="titlebar-controls">
+                        <button onclick="minWin('${wid}')"><svg viewBox="0 0 12 12"><rect y="5" width="10" height="1" fill="currentColor"/></svg></button>
+                        <button onclick="maxWin('${wid}')"><svg viewBox="0 0 12 12"><rect x=".5" y=".5" width="9" height="9" stroke="currentColor" fill="none"/></svg></button>
+                        <button class="close-btn" onclick="closeWin('${wid}')"><svg viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.3"/></svg></button>
+                    </div>
+                </div>
+                <div class="window-body" id="body-${labId}">${renderLab(lab)}</div>
+                <div class="resize-se" onmousedown="startResize(event,'${wid}')"></div>
+            `;
+            
+            w.addEventListener('mousedown', () => setActive(wid));
+            document.getElementById('desktop').appendChild(w);
+            wins[wid] = { labId, min: false };
+            setActive(wid); 
+            renderTB();
+        }
+
+        // ==================== RENDER LAB CONTENT ====================
+        function renderLab(l) {
+            const badges = { light: 'badge-light', sound: 'badge-sound', motion: 'badge-motion', display: 'badge-display' };
+            const hasOriginal = l.codeOriginal && l.codeOriginal.trim().length > 0;
+            const hasMod = l.codeMod && l.codeMod.trim().length > 0;
+            
+            return `
+                <div class="lab-page">
+                    <div class="lab-header">
+                        <span class="project-badge ${badges[l.project]}">${l.projectName}</span>
+                        <div class="lab-title">Circuit ${l.id}: ${l.title}</div>
+                        <div class="lab-subtitle">SparkFun Inventor's Kit v4.0</div>
+                        <div class="lab-desc">${l.description}</div>
+                    </div>
+                    
+                    <!-- Media Section -->
+                    <div class="section">
+                        <div class="section-header">Media Documentation</div>
+                        <div class="media-row">
+                            <div class="media-card">
+                                ${l.video ? `<div class="video-thumb-wrap" onclick="openMediaViewer('video','${l.video}')" title="Click to play"><video src="${l.video}" onerror="this.parentElement.innerHTML='<div class=\\'media-empty\\'><svg viewBox=\\'0 0 24 24\\' fill=\\'currentColor\\'><path d=\\'M17 10.5V7a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1v-3.5l4 4v-11l-4 4z\\'/></svg><span>Video not found</span></div>'"></video><div class="play-overlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div></div>` : `<div class="media-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1v-3.5l4 4v-11l-4 4z"/></svg><span>No video</span></div>`}
+                                <div class="media-footer"><span>Video Demo</span></div>
+                            </div>
+                            <div class="media-card">
+                                ${l.photo ? `<div class="photo-thumb-wrap" onclick="openMediaViewer('image','${l.photo}')" title="Click to view"><img src="${l.photo}" onerror="this.parentElement.innerHTML='<div class=\\'media-empty\\'><svg viewBox=\\'0 0 24 24\\' fill=\\'currentColor\\'><path d=\\'M21 19V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z\\'/></svg><span>Image not found</span></div>'"><div class="zoom-overlay"><svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/><path d="M12 10h-2v2H9v-2H7V9h2V7h1v2h2v1z"/></svg></div></div>` : `<div class="media-empty"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z"/></svg><span>No photo</span></div>`}
+                                <div class="media-footer"><span>Circuit Photo</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Components Section -->
+                    <div class="section">
+                        <div class="section-header">
+                            Components Used 
+                            <button class="edit-btn" onclick="openModal('${l.id}')">
+                                <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                                Edit
+                            </button>
+                        </div>
+                        <div class="chips">${l.components.map(c => `<span class="chip">${c}</span>`).join('')}</div>
+                    </div>
+
+                    <!-- Observations Section -->
+                    <div class="section">
+                        <div class="section-header">Observations</div>
+                        <div class="obs-box ${!l.observations ? 'empty' : ''}">
+                            <p>${l.observations || 'Click Edit above to add your observations about what is happening in the circuit and how the components interact.'}</p>
+                        </div>
+                    </div>
+
+                    <!-- Code Section -->
+                    <div class="section">
+                        <div class="section-header">Arduino Code</div>
+                        
+                        <!-- Original Code Editor -->
+                        <div class="code-section">
+                            <div class="code-section-header">
+                                <span class="code-section-title">Original Code</span>
+                            </div>
+                            <div class="code-editor-wrap">
+                                <textarea 
+                                    class="code-editor" 
+                                    id="code-orig-${l.id}" 
+                                    placeholder="// Paste your original Arduino code here..."
+                                    onchange="saveCode('${l.id}', 'original', true)"
+                                    oninput="saveCode('${l.id}', 'original')"
+                                >${l.codeOriginal}</textarea>
+                                <span class="code-status ${hasOriginal ? 'has-code' : ''}">${hasOriginal ? '✓ Saved' : 'Empty'}</span>
+                            </div>
+                        </div>
+
+                        <!-- Modified Code Editor -->
+                        <div class="code-section">
+                            <div class="code-section-header">
+                                <span class="code-section-title">Modified Code</span>
+                            </div>
+                            <div class="code-editor-wrap">
+                                <textarea 
+                                    class="code-editor" 
+                                    id="code-mod-${l.id}" 
+                                    placeholder="// Paste your modified Arduino code here..."
+                                    onchange="saveCode('${l.id}', 'modified', true)"
+                                    oninput="saveCode('${l.id}', 'modified')"
+                                >${l.codeMod}</textarea>
+                                <span class="code-status ${hasMod ? 'has-code' : ''}">${hasMod ? '✓ Saved' : 'Empty'}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== SAVE CODE ====================
+        function saveCode(id, type, immediate = false) {
+            const lab = labs.find(l => l.id === id);
+            if (type === 'original') {
+                lab.codeOriginal = document.getElementById('code-orig-' + id).value;
+            } else {
+                lab.codeMod = document.getElementById('code-mod-' + id).value;
+            }
+            // Update status indicator
+            const statusEl = document.getElementById('code-' + (type === 'original' ? 'orig' : 'mod') + '-' + id).parentElement.querySelector('.code-status');
+            const hasCode = (type === 'original' ? lab.codeOriginal : lab.codeMod).trim().length > 0;
+            statusEl.className = 'code-status' + (hasCode ? ' has-code' : '');
+            statusEl.textContent = hasCode ? '✓ Saved' : 'Empty';
+            
+            // Save to localStorage (debounced for typing, immediate for blur)
+            if (immediate) {
+                saveToStorage();
+            } else {
+                saveToStorageDebounced();
+            }
+        }
+
+        // ==================== MEDIA (All hardcoded - no uploads) ====================
+        
+        function refresh(id) { 
+            const b = document.getElementById('body-' + id); 
+            if (b) b.innerHTML = renderLab(labs.find(l => l.id === id)); 
+        }
+
+        // ==================== MODAL ====================
+        function openModal(id) { 
+            editId = id; 
+            const l = labs.find(x => x.id === id); 
+            document.getElementById('modalTitle').textContent = `Edit Circuit ${l.id}`; 
+            document.getElementById('editComp').value = l.components.join(', '); 
+            document.getElementById('editObs').value = l.observations; 
+            document.getElementById('modalBg').classList.add('show'); 
+        }
+        
+        function closeModal() { 
+            document.getElementById('modalBg').classList.remove('show'); 
+            editId = null; 
+        }
+        
+        function saveEdit() { 
+            if (!editId) return; 
+            const l = labs.find(x => x.id === editId); 
+            l.components = document.getElementById('editComp').value.split(',').map(s => s.trim()).filter(Boolean); 
+            l.observations = document.getElementById('editObs').value; 
+            saveToStorage();
+            refresh(editId); 
+            closeModal(); 
+        }
+
+        // ==================== WINDOW CONTROLS ====================
+        function minWin(id) { document.getElementById(id).style.display = 'none'; wins[id].min = true; renderTB(); }
+        function maxWin(id) { document.getElementById(id).classList.toggle('maximized'); }
+        function closeWin(id) { document.getElementById(id).remove(); delete wins[id]; renderTB(); }
+        
+        function setActive(id) { 
+            document.querySelectorAll('.window').forEach(w => w.classList.remove('active')); 
+            const w = document.getElementById(id); 
+            if (w) { w.classList.add('active'); w.style.zIndex = ++zIdx; activeWin = id; } 
+            renderTB(); 
+        }
+        
+        function tbClick(id) { 
+            if (wins[id].min) { document.getElementById(id).style.display = 'flex'; wins[id].min = false; setActive(id); } 
+            else if (id === activeWin) minWin(id); 
+            else setActive(id); 
+        }
+        
+        function startDrag(e, id) { 
+            if (e.target.closest('.titlebar-controls')) return; 
+            const w = document.getElementById(id); 
+            if (w.classList.contains('maximized')) return; 
+            setActive(id); 
+            drag = { id, sx: e.clientX, sy: e.clientY, ox: w.offsetLeft, oy: w.offsetTop }; 
+        }
+        
+        function startResize(e, id) { 
+            const w = document.getElementById(id); 
+            if (w.classList.contains('maximized')) return; 
+            resize = { id, sx: e.clientX, sy: e.clientY, ow: w.offsetWidth, oh: w.offsetHeight }; 
+        }
+
+        // ==================== EVENT LISTENERS ====================
+        function events() {
+            // Mouse move for dragging
+            document.addEventListener('mousemove', e => {
+                // Window drag
+                if (drag) { 
+                    const w = document.getElementById(drag.id); 
+                    w.style.left = drag.ox + e.clientX - drag.sx + 'px'; 
+                    w.style.top = Math.max(0, drag.oy + e.clientY - drag.sy) + 'px'; 
+                }
+                // Window resize
+                if (resize) { 
+                    const w = document.getElementById(resize.id); 
+                    w.style.width = Math.max(600, resize.ow + e.clientX - resize.sx) + 'px'; 
+                    w.style.height = Math.max(500, resize.oh + e.clientY - resize.sy) + 'px'; 
+                }
+                // Icon drag
+                if (iconDrag) {
+                    const dx = e.clientX - iconDrag.sx, dy = e.clientY - iconDrag.sy;
+                    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) { 
+                        iconDrag.moved = true; 
+                        iconDrag.el.classList.add('dragging'); 
+                    }
+                    if (iconDrag.moved) { 
+                        iconDrag.el.style.left = Math.max(0, iconDrag.ox + dx) + 'px'; 
+                        iconDrag.el.style.top = Math.max(0, iconDrag.oy + dy) + 'px'; 
+                    }
+                }
+            });
+            
+            // Mouse up
+            document.addEventListener('mouseup', () => {
+                if (iconDrag) {
+                    iconDrag.el.classList.remove('dragging');
+                    if (iconDrag.moved) {
+                        const rect = document.getElementById('desktop').getBoundingClientRect();
+                        let x = Math.max(8, Math.min(parseInt(iconDrag.el.style.left), rect.width - 82));
+                        let y = Math.max(8, Math.min(parseInt(iconDrag.el.style.top), rect.height - 84));
+                        x = Math.round(x / GRID) * GRID + 8; 
+                        y = Math.round(y / GRID) * GRID + 8;
+                        iconDrag.el.style.left = x + 'px'; 
+                        iconDrag.el.style.top = y + 'px';
+                        iconPositions[iconDrag.id] = { x, y };
+                    }
+                    iconDrag = null;
+                }
+                drag = null; 
+                resize = null;
+            });
+            
+            // Start button
+            document.getElementById('startBtn').addEventListener('click', toggleStart);
+            
+            // Click outside start menu
+            document.addEventListener('click', e => { 
+                const m = document.getElementById('startMenu'), b = document.getElementById('startBtn'); 
+                if (!m.contains(e.target) && !b.contains(e.target)) m.classList.remove('open'); 
+            });
+            
+            // Search in start menu
+            document.getElementById('searchInput').addEventListener('input', e => { 
+                const q = e.target.value.toLowerCase(); 
+                document.querySelectorAll('.start-item').forEach(i => { 
+                    i.style.display = i.textContent.toLowerCase().includes(q) ? '' : 'none'; 
+                }); 
+            });
+            
+            // Modal backdrop click
+            document.getElementById('modalBg').addEventListener('click', e => { 
+                if (e.target === document.getElementById('modalBg')) closeModal(); 
+            });
+            
+            // Desktop click to deselect
+            document.getElementById('desktop').addEventListener('click', e => { 
+                if (e.target === document.getElementById('desktop') || e.target === document.getElementById('icons')) {
+                    document.querySelectorAll('.desktop-icon').forEach(i => i.classList.remove('selected')); 
+                }
+            });
+            
+            // Escape key closes media viewer
+            document.addEventListener('keydown', e => {
+                if (e.key === 'Escape') {
+                    const viewer = document.getElementById('mediaViewer');
+                    if (viewer.classList.contains('open')) {
+                        closeMediaViewer();
+                    }
+                }
+            });
+        }
+
+        // ==================== LOCAL STORAGE PERSISTENCE ====================
+        const STORAGE_KEY = 'arduino-labs-data';
+        let saveTimeout = null;
+        
+        function saveToStorage() {
+            const dataToSave = labs.map(l => ({
+                id: l.id,
+                components: l.components,
+                observations: l.observations,
+                codeOriginal: l.codeOriginal,
+                codeMod: l.codeMod
+                // video and photo are hardcoded, not saved
+            }));
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+                return true;
+            } catch (e) {
+                console.warn('Storage error');
+                alert('Browser storage is full! Your changes are saved for this session only.');
+                return false;
+            }
+        }
+        
+        function saveToStorageDebounced() {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(saveToStorage, 500);
+        }
+        
+        function loadFromStorage() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    data.forEach(saved => {
+                        const lab = labs.find(l => l.id === saved.id);
+                        if (lab) {
+                            lab.components = saved.components || lab.components;
+                            lab.observations = saved.observations || '';
+                            lab.codeOriginal = saved.codeOriginal || lab.codeOriginal;
+                            lab.codeMod = saved.codeMod || lab.codeMod;
+                            // video and photo are hardcoded, not loaded from storage
+                        }
+                    });
+                }
+            } catch (e) {
+                console.warn('Error loading saved data:', e);
+            }
+        }
+
+        // ==================== MEDIA VIEWER ====================
+        function openMediaViewer(type, src) {
+            const viewer = document.getElementById('mediaViewer');
+            const content = document.getElementById('mvContent');
+            
+            if (type === 'video') {
+                content.innerHTML = `<video src="${src}" controls autoplay></video>`;
+            } else {
+                content.innerHTML = `<img src="${src}">`;
+            }
+            
+            viewer.classList.add('open');
+        }
+        
+        function closeMediaViewer(e) {
+            // If called from click, only close if clicking backdrop (not content)
+            if (e && e.target.closest('.mv-content')) return;
+            
+            const viewer = document.getElementById('mediaViewer');
+            const content = document.getElementById('mvContent');
+            
+            // Stop video if playing
+            const video = content.querySelector('video');
+            if (video) video.pause();
+            
+            viewer.classList.remove('open');
+            content.innerHTML = '';
+        }
+
+        // ==================== UTILITIES ====================
+        function toggleStart() { document.getElementById('startMenu').classList.toggle('open'); }
+        
+        function tick() { 
+            const n = new Date(); 
+            document.getElementById('time').textContent = n.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); 
+            document.getElementById('date').textContent = n.toLocaleDateString([], { month: 'numeric', day: 'numeric', year: 'numeric' }); 
+        }
+    </script>
+</body>
+</html>
