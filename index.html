@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arduino Labs/title>
+    <title>Arduino Labs</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -554,7 +554,7 @@
                 projectName: "Project 1: Light",
                 description: "Learn the basics of controlling an LED by making it blink on and off. This introduces digital outputs and the fundamental concepts of programming the RedBoard.",
                 components: ["SparkFun RedBoard", "Breadboard", "LED (Blue)", "330Ω Resistor", "Jumper Wires"], 
-                observations: "", 
+                observations: "The LED turns on for 2 seconds then off for 2 seconds, repeating forever. The 330Ω resistor is needed to protect the LED from getting too much current. Without it, the LED would burn out. When I changed the delay from 2000 to 500, the blinking got way faster.",
                 codeOriginal: `/*
   SparkFun Inventor's Kit
   Circuit 1A-Blink
@@ -600,7 +600,7 @@ void loop() {
                 projectName: "Project 1: Light",
                 description: "Use a potentiometer (variable resistor) to control how fast an LED blinks. Learn about analog inputs and reading values between 0-1023.",
                 components: ["SparkFun RedBoard", "Breadboard", "LED (Blue)", "Potentiometer (10kΩ)", "330Ω Resistor", "Jumper Wires"], 
-                observations: "", 
+                observations: "Turning the potentiometer knob changes how fast the LED blinks. All the way left = super fast blinking, all the way right = slow blinking. The Serial Monitor shows numbers from 0-1023 depending on knob position. The potentiometer basically acts like a dimmer switch but for the delay time.",
                 codeOriginal: `/*
   SparkFun Inventor's Kit
   Circuit 1B-Potentiometer
@@ -662,7 +662,7 @@ void loop() {
                 projectName: "Project 1: Light",
                 description: "Create a simple night-light using a photoresistor (light sensor). The LED turns on when the room gets dark and turns off when it's bright.",
                 components: ["SparkFun RedBoard", "Breadboard", "LED (Blue)", "Photoresistor", "330Ω Resistor", "10kΩ Resistor", "Jumper Wires"], 
-                observations: "", 
+                observations: "When I cover the photoresistor with my hand, the LED turns on. When there's light hitting it, the LED stays off. It's basically an automatic night light. The threshold value (750) determines how dark it needs to be before the LED activates. Lower threshold = needs to be darker to trigger.",
                 codeOriginal: `/*
   SparkFun Inventor's Kit
   Circuit 1C-Photoresistor
@@ -730,7 +730,7 @@ void loop() {
                 projectName: "Project 1: Light",
                 description: "Build a multicolored night-light using an RGB LED, photoresistor, and potentiometer. Change colors with the knob when it gets dark.",
                 components: ["SparkFun RedBoard", "Breadboard", "RGB LED (Common Cathode)", "Photoresistor", "Potentiometer (10kΩ)", "3x 330Ω Resistors", "10kΩ Resistor", "Jumper Wires"], 
-                observations: "", 
+                observations: "This combines the photoresistor and potentiometer to control an RGB LED. When it's dark, turning the knob cycles through different colors: red, orange, yellow, green, cyan, blue, magenta. When there's light, the LED stays off completely. The RGB LED is actually 3 LEDs in one that mix together to make different colors.", 
                 codeOriginal: `/*
   SparkFun Inventor's Kit
   Circuit 1D-RGB Nightlight
@@ -935,7 +935,7 @@ void turnOff () {
                 projectName: "Project 2: Sound",
                 description: "Use a piezo buzzer to make music by pulsing electricity at different frequencies. Learn about the tone() function and how frequency creates pitch.",
                 components: ["SparkFun RedBoard", "Breadboard", "Piezo Buzzer", "Potentiometer (10kΩ)", "Jumper Wires"], 
-                observations: "", 
+                observations: "The buzzer plays Happy Birthday by sending different frequencies to make different notes. Higher frequency = higher pitch. The song plays once then stops because of the while(true) loop at the end. The delay between notes controls the tempo - shorter delays make it play faster.", 
                 codeOriginal: `/*
   SparkFun Inventor's Kit
   Circuit 2A - Buzzer
@@ -1081,7 +1081,7 @@ void play(char note, int beats) {
                 projectName: "Project 2: Sound",
                 description: "Build a simple musical instrument using buttons and a buzzer. Each button plays a different note when pressed using INPUT_PULLUP.",
                 components: ["SparkFun RedBoard", "Breadboard", "Piezo Buzzer", "3x Push Buttons", "Potentiometer (10kΩ)", "Jumper Wires"], 
-                observations: "", 
+                observations: "Each button plays a different note when pressed. Button 1 = C, Button 2 = E, Button 3 = G. When no buttons are pressed, noTone() stops the sound. The INPUT_PULLUP means the buttons read HIGH normally and LOW when pressed, which is backwards from what you'd expect.",
                 codeOriginal: `/*
   SparkFun Inventor's Kit
   Circuit 2B-ButtonTrumpet
@@ -1179,7 +1179,7 @@ void loop() {
                 projectName: "Project 2: Sound",
                 description: "Create the classic Simon Says memory game! LEDs flash a pattern and the player must repeat it using color-coded buttons before time runs out.",
                 components: ["SparkFun RedBoard", "Breadboard", "Piezo Buzzer", "4x LEDs (Red, Blue, Green, Yellow)", "4x Push Buttons", "4x 330Ω Resistors", "Jumper Wires"], 
-                observations: "", 
+                observations: "The game flashes a pattern of colored LEDs and you have to repeat it by pressing the matching buttons. Each round adds one more to the sequence. If you press the wrong button or take too long (2 seconds), you lose. The random sequence is generated at the start using noise from an unused analog pin to make it truly random.",
                 codeOriginal: `/*
   SparkFun Inventor's Kit
   Circuit 2C-Simon Says
@@ -1538,7 +1538,7 @@ void loseSequence() {
                 projectName: "Project 3: Motion",
                 description: "Control a servo motor's position using a potentiometer. Servos can rotate to specific angles between 0-180 degrees using the Servo library.",
                 components: ["SparkFun RedBoard", "Breadboard", "Servo Motor", "Potentiometer (10kΩ)", "Jumper Wires"], 
-                observations: "", 
+                observations: "Turning the potentiometer makes the servo motor rotate to match. Fully left = servo at ~20°, fully right = servo at ~160°. The map() function converts the pot reading (0-1023) to servo angle. The servo holds its position even if you try to push it - it fights back to stay where it's told.",
                 codeOriginal: `/*
   SparkFun Inventor's Kit
   Circuit 3A-Servo
@@ -1602,7 +1602,7 @@ void loop() {
                 projectName: "Project 3: Motion",
                 description: "Use an ultrasonic distance sensor (HC-SR04) to measure distances. It sends sound pulses and measures how long they take to bounce back.",
                 components: ["SparkFun RedBoard", "Breadboard", "Ultrasonic Distance Sensor (HC-SR04)", "Jumper Wires"], 
-                observations: "", 
+                observations: "The ultrasonic sensor measures distance by sending out sound waves and timing how long they take to bounce back. Close objects (<10 inches) = red LED, medium distance = yellow, far away = green. The Serial Monitor shows the actual distance in inches updating in real-time.",
                 codeOriginal: `/*
   SparkFun Inventor's Kit
   Circuit 3B-Distance Sensor
@@ -1752,7 +1752,7 @@ float getDistance() {
                 projectName: "Project 3: Motion",
                 description: "Build a motion alarm that uses the distance sensor to detect intruders. When triggered, it activates a buzzer, RGB LED color change, and servo motor.",
                 components: ["SparkFun RedBoard", "Breadboard", "Ultrasonic Distance Sensor (HC-SR04)", "Servo Motor", "Piezo Buzzer", "RGB LED", "3x 330Ω Resistors", "Jumper Wires"], 
-                observations: "", 
+                observations: "When something gets within 10 inches of the sensor, all three outputs activate: LED turns red, buzzer starts beeping, and servo wiggles back and forth rapidly. It's like a mini security alarm. The servo wiggling creates movement to grab attention along with the sound and light.", 
                 codeOriginal: `/*
   SparkFun Inventor's Kit
   Circuit 3C-Motion Alarm
@@ -1939,7 +1939,7 @@ float getDistance() {
                 projectName: "Project 4: Display",
                 description: "Learn to use a 16x2 character LCD display with the LiquidCrystal library. Print text messages and create scrolling effects.",
                 components: ["SparkFun RedBoard", "Breadboard", "LCD Display (16x2)", "Potentiometer (10kΩ)", "Jumper Wires"], 
-                observations: "", 
+                observations: "The LCD displays \"Hello, world!\" on the top row and a seconds counter on the bottom row. The potentiometer adjusts the contrast - if you can't see the text, turn the pot until it's visible. The counter starts from 0 when the Arduino resets and keeps counting up.",
                 codeOriginal: `/*
   SparkFun Inventor's Kit
   Circuit 4A-HelloWorld
@@ -2003,7 +2003,7 @@ void loop() {
                 projectName: "Project 4: Display",
                 description: "Create a digital thermometer using a TMP36 temperature sensor and LCD display. Show real-time temperature readings in Celsius and Fahrenheit.",
                 components: ["SparkFun RedBoard", "Breadboard", "LCD Display (16x2)", "Temperature Sensor (TMP36)", "Potentiometer (10kΩ)", "Jumper Wires"], 
-                observations: "", 
+                observations: "The temperature sensor reads the room temperature and displays it on the LCD in both Celsius and Fahrenheit. Touching the sensor with my finger makes the temperature go up. The readings update every second. The display shows around 20-25°C at room temperature.", 
                 codeOriginal: `/*
   SparkFun Inventor's Kit
   Circuit 4B - Temperature Sensor
@@ -2091,7 +2091,7 @@ void loop() {
                 projectName: "Project 4: Display",
                 description: "Build an interactive guessing game displayed on the LCD. Use buttons to scroll through clues and make guesses. Includes buzzer for feedback.",
                 components: ["SparkFun RedBoard", "Breadboard", "LCD Display (16x2)", "Piezo Buzzer", "Potentiometer (10kΩ)", "2x Push Buttons", "Jumper Wires"], 
-                observations: "", 
+                observations: "Random animal names appear on the screen and teammates give clues while one person guesses. Press the button when they guess right to move to the next word. A countdown timer shows how many seconds are left. If time runs out, game over and it shows your score. Get through all words to win.", 
                 codeOriginal: `/*
   SparkFun Inventor's Kit
   Circuit 4C - Heads Up Game
@@ -2799,25 +2799,24 @@ void winner() {
         }
         
         function loadFromStorage() {
-            try {
-                const saved = localStorage.getItem(STORAGE_KEY);
-                if (saved) {
-                    const data = JSON.parse(saved);
-                    data.forEach(saved => {
-                        const lab = labs.find(l => l.id === saved.id);
-                        if (lab) {
-                            lab.components = saved.components || lab.components;
-                            lab.observations = saved.observations || '';
-                            lab.codeOriginal = saved.codeOriginal || lab.codeOriginal;
-                            lab.codeMod = saved.codeMod || lab.codeMod;
-                            // video and photo are hardcoded, not loaded from storage
-                        }
-                    });
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            const data = JSON.parse(saved);
+            data.forEach(saved => {
+                const lab = labs.find(l => l.id === saved.id);
+                if (lab) {
+                    if (saved.components && saved.components.length) lab.components = saved.components;
+                    if (saved.observations) lab.observations = saved.observations;
+                    if (saved.codeOriginal) lab.codeOriginal = saved.codeOriginal;
+                    if (saved.codeMod) lab.codeMod = saved.codeMod;
                 }
-            } catch (e) {
-                console.warn('Error loading saved data:', e);
-            }
+            });
         }
+    } catch (e) {
+        console.warn('Error loading saved data:', e);
+    }
+}
 
         // ==================== MEDIA VIEWER ====================
         function openMediaViewer(type, src) {
